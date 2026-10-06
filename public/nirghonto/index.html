@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Nirghonto · Girish Bhawan</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a><a href="/tshirt/">T-shirt orders</a></nav>
+  </div>
+  <header>
+    <div>
+      <p class="eyebrow" lang="bn">নির্ঘণ্ট</p>
+      <h1 id="evTitle">Durga Puja 2026 Nirghonto</h1>
+      <p class="sub">The schedule of the Pujo at Girish Bhawan. <a id="wallLink" href="/event/?e=durga-puja-2026">See the photos.</a></p>
+    </div>
+  </header>
+
+  <figure class="schedimg" id="schedFig">
+    <div class="placeholder" id="schedPh">The Nirghonto card will be added here.</div>
+    <img id="schedImg" alt="Nirghonto card" hidden>
+  </figure>
+
+  <p class="notebox" id="note" hidden></p>
+  <div class="msg" id="pageMsg" role="status"></div>
+  <div id="days"></div>
+
+  <section id="schedAdmin" hidden>
+    <h2>Edit the schedule</h2>
+    <div class="admin">
+      <div class="f">
+        <label class="label" for="imgFile">Nirghonto image</label>
+        <p class="hint">Upload the Nirghonto card as a photo or picture file. It replaces the placeholder at the top of this page.</p>
+        <input type="file" id="imgFile" accept="image/*">
+        <div class="actions"><button class="primary" type="button" id="imgSave">Upload image</button><button type="button" class="danger" id="imgRemove" hidden>Remove image</button></div>
+        <div class="msg" id="imgMsg" role="status"></div>
+      </div>
+      <hr>
+      <div class="f">
+        <label class="label" for="schedText">Days and timings</label>
+        <p class="hint">Start each day with # followed by the day and its date, separated by |. Under it, put one line per event as time | event.</p>
+        <textarea id="schedText" rows="14" placeholder="# Maha Saptami | Sunday, 18 October&#10;6:30 AM | Nabapatrika snan&#10;8:00 AM | Puja begins"></textarea>
+      </div>
+      <div class="f"><label class="label" for="schedNote">Note shown at the top (optional)</label><textarea id="schedNote" rows="2" maxlength="600"></textarea></div>
+      <div class="actions"><button class="primary" type="button" id="schedSave">Save schedule</button></div>
+      <div class="msg" id="schedMsg" role="status"></div>
+    </div>
+  </section>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/nirghonto.js"></script>
+</body>
+</html>

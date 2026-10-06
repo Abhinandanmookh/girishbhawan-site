@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Admin · Girish Bhawan</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a><a href="/tshirt/">T-shirt orders</a></nav>
+  </div>
+  <header>
+    <div>
+      <h1>Admin</h1>
+      <p class="sub">Approve family members, decide who sees what, and keep a backup.</p>
+    </div>
+  </header>
+
+  <p class="notebox" id="adminGate" hidden>This page is for the admin. <a href="/account/">Log in</a> with the username admin.</p>
+
+  <div id="adminBody" class="stack" style="gap:32px" hidden>
+    <section>
+      <div class="head"><h2>Family members</h2><span class="label" id="uCount"></span></div>
+      <div class="msg" id="uMsg" role="status"></div>
+      <div class="stack" id="users"></div>
+    </section>
+
+    <section>
+      <h2>Family groups</h2>
+      <p class="hint">Groups are how you give access. Put each approved member into one or more groups, then choose which groups can open each section.</p>
+      <div class="stack" id="groups"></div>
+    </section>
+
+    <section>
+      <h2>Sections with documents</h2>
+      <p class="hint">Each section is a page of documents, such as the Pujo and Bhog accounts. New sections start as admin only.</p>
+      <div class="stack" id="sections"></div>
+    </section>
+
+    <section>
+      <h2>Events</h2>
+      <p class="hint">Each event gets a photo wall and, if you tick it, a Nirghonto page. Add next year's Pujo or any other occasion here.</p>
+      <div class="stack" id="events"></div>
+    </section>
+
+    <section>
+      <h2>Social links</h2>
+      <div class="admin">
+        <div class="row">
+          <label class="f" for="lFb"><span class="label">Facebook page</span><input id="lFb" inputmode="url" autocomplete="off"></label>
+          <label class="f" for="lIg"><span class="label">Instagram page</span><input id="lIg" inputmode="url" autocomplete="off"></label>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="actions"><button class="primary" type="button" id="siteSave">Save groups, sections, events and links</button></div>
+      <div class="msg" id="siteMsg" role="status"></div>
+      <p class="hint">Removing a section or event hides its page. The photos and documents in it stay stored and come back if you add it again with the same title.</p>
+    </section>
+
+    <section>
+      <h2>Backup</h2>
+      <div class="admin">
+        <p class="hint">The backup is one zip file with everything on the site: orders, members, posts, schedules, photos and documents. Download one after any important change and keep it on your computer or Google Drive.</p>
+        <div class="actions"><button class="primary" type="button" id="bkGet">Download backup</button></div>
+        <hr>
+        <label class="f" for="bkFile"><span class="label">Restore from a backup zip</span><input type="file" id="bkFile" accept=".zip"></label>
+        <div class="actions"><button type="button" class="danger" id="bkPut">Restore from backup</button></div>
+        <div class="msg" id="bkMsg" role="status"></div>
+      </div>
+    </section>
+  </div>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/admin.js"></script>
+</body>
+</html>

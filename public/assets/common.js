@@ -1,9 +1,11 @@
-/* Shared helpers: server calls, admin login, footer. */
+/* Shared helpers: server calls, who is logged in, navigation and footer. */
 window.GB = (function () {
-  var admin = false, subs = [];
+  var subs = [], site = null, me = { admin: false, user: null };
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function flash(node, text, err) { node.textContent = text; node.className = "msg" + (err ? " err" : ""); }
+  function qs(name) { try { return new URLSearchParams(location.search).get(name) || ""; } catch (e) { return ""; } }
+  function when(ts) { try { return new Date(ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); } catch (e) { return ""; } }
   function api(path, body) {
     return fetch("/api/" + path, {
       method: body ? "POST" : "GET", credentials: "same-origin", cache: "no-store",
@@ -16,39 +18,40 @@ window.GB = (function () {
       });
     });
   }
-  function setAdmin(a) {
-    admin = !!a;
-    if ($("loginLink")) { $("loginLink").hidden = admin; $("logoutBtn").hidden = !admin; if (admin) $("loginSec").hidden = true; }
-    subs.forEach(function (f) { f(admin); });
-  }
-  function onAdmin(f) { subs.push(f); f(admin); }
+  function link(href, text, cls) { var a = el("a", cls, text); a.href = href; return a; }
+  function ext(href, text) { var a = link(href, text); a.target = "_blank"; a.rel = "noopener"; return a; }
+  function sep(node) { node.appendChild(document.createTextNode(" · ")); }
 
-  var foot = $("siteFoot");
-  if (foot) {
-    var sec = el("section"); sec.id = "loginSec"; sec.hidden = true;
-    sec.innerHTML = '<h2>Admin login</h2><form id="loginForm" novalidate><div class="row">'
-      + '<label class="f" for="lUser"><span class="label">Username</span><input id="lUser" autocomplete="username" autocapitalize="none"></label>'
-      + '<label class="f" for="lPass"><span class="label">Password</span><input id="lPass" type="password" autocomplete="current-password"></label></div>'
-      + '<div class="actions"><button class="primary" type="submit">Log in</button><button type="button" id="lCancel">Cancel</button></div>'
-      + '<div class="msg" id="lMsg" role="status"></div></form>';
-    foot.parentNode.insertBefore(sec, foot);
-    foot.innerHTML = 'Girish Bhawan, Bhowanipore, Kolkata · <a href="https://www.facebook.com/girishbhawan" target="_blank" rel="noopener">Girish Bhawan on Facebook</a> · '
-      + '<button class="linkbtn" type="button" id="loginLink">Admin login</button><button class="linkbtn" type="button" id="logoutBtn" hidden>Log out</button>';
-    $("loginLink").addEventListener("click", function () { sec.hidden = false; $("lUser").focus(); sec.scrollIntoView({ block: "nearest" }); });
-    $("lCancel").addEventListener("click", function () { sec.hidden = true; });
-    $("loginForm").addEventListener("submit", function (ev) {
-      ev.preventDefault(); flash($("lMsg"), "Checking…");
-      api("login", { user: $("lUser").value.trim(), pass: $("lPass").value }).then(function () {
-        $("lPass").value = ""; flash($("lMsg"), ""); setAdmin(true);
-      }, function (e) {
-        flash($("lMsg"), e.status === 429 ? "Too many wrong attempts. Wait 15 minutes and try again."
-          : e.status === 401 ? "Wrong username or password."
-          : e.status === 503 ? "The admin password has not been set in Netlify yet."
-          : "Could not reach the server. Try again.", true);
-      });
-    });
-    $("logoutBtn").addEventListener("click", function () { api("logout", {}).then(function () {}, function () {}).then(function () { setAdmin(false); }); });
+  function draw() {
+    var nav = $("siteNav"), here = location.pathname + location.search;
+    if (nav && site) {
+      nav.textContent = "";
+      var items = [["/", "Home"]];
+      site.events.forEach(function (e) { items.push(["/event/?e=" + e.id, e.title]); });
+      items.push(["/tshirt/", "T-shirt orders"]);
+      site.sections.forEach(function (s) { items.push(["/section/?s=" + s.id, s.title]); });
+      items.forEach(function (it) { var a = link(it[0], it[1]); if (it[0] === here || (it[0] === "/" && location.pathname === "/")) a.setAttribute("aria-current", "page"); nav.appendChild(a); });
+    }
+    var foot = $("siteFoot");
+    if (foot) {
+      foot.textContent = "Girish Bhawan, Bhowanipore, Kolkata";
+      var L = (site && site.links) || {};
+      if (L.facebook) { sep(foot); foot.appendChild(ext(L.facebook, "Facebook")); }
+      if (L.instagram) { sep(foot); foot.appendChild(ext(L.instagram, "Instagram")); }
+      sep(foot);
+      if (me.admin) { foot.appendChild(link("/admin/", "Admin page")); sep(foot); }
+      if (me.admin || me.user) {
+        if (me.user) { foot.appendChild(link("/account/", me.user.name)); sep(foot); }
+        var out = el("button", "linkbtn", "Log out"); out.type = "button";
+        out.addEventListener("click", function () { api("logout", {}).then(function () {}, function () {}).then(function () { location.href = "/"; }); });
+        foot.appendChild(out);
+      } else foot.appendChild(link("/account/", "Log in or register"));
+    }
   }
+  function fire() { subs.forEach(function (f) { f(me.admin); }); }
+  function onAdmin(f) { subs.push(f); f(me.admin); }
+  function setAdmin(a) { me.admin = !!a; draw(); fire(); }
+
   /* Shrink a picture in the browser so uploads stay small and carry no location data.
      tries = [[longest side in px, JPEG quality], ...]; rejects with "read" or "big". */
   function shrink(file, tries, maxChars) {
@@ -70,6 +73,9 @@ window.GB = (function () {
       img.src = url;
     });
   }
-  api("me").then(function (j) { setAdmin(j.admin); }, function () {});
-  return { api: api, el: el, flash: flash, onAdmin: onAdmin, setAdmin: setAdmin, shrink: shrink, $: $ };
+
+  draw();
+  var ready = api("site").then(function (j) { site = j; me = j.me; draw(); fire(); return j; }, function () { return null; });
+  return { api: api, el: el, flash: flash, qs: qs, when: when, onAdmin: onAdmin, setAdmin: setAdmin, shrink: shrink, ready: ready, $: $,
+    me: function () { return me; }, site: function () { return site; } };
 })();

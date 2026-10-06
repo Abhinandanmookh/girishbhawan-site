@@ -14,7 +14,7 @@
 <div class="wrap">
   <div class="site-head">
     <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
-    <nav aria-label="Site"><a href="/">Home</a><a href="/durga-puja-2026/">Durga Puja 2026</a><a href="/durga-puja-2026/nirghonto/">Nirghonto</a><a href="/tshirt/" aria-current="page">T-shirt orders</a></nav>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a><a href="/tshirt/">T-shirt orders</a></nav>
   </div>
   <header>
     <div>
@@ -81,7 +81,7 @@
     <div class="admin">
       <div class="f">
         <label class="label" for="upFile">Upload names and sizes</label>
-        <p class="hint">Choose a CSV file with the columns Name, S, M, L, XL, XXL (Received, Paid on and Note are optional), or paste a list with one person per line. Names already in the table get their sizes updated; new names are added.</p>
+        <p class="hint">Choose a CSV file with the columns Name and one column per size (Received, Paid on and Note are optional), or paste a list with one person per line. Names already in the table get their sizes updated; new names are added.</p>
         <input type="file" id="upFile" accept=".csv,.txt,text/csv,text/plain">
         <textarea id="upText" rows="5" aria-label="Paste a list" placeholder="Sunny - M-1, S-1&#10;Babul - XXL-4"></textarea>
         <label class="chk" for="upReplace"><input type="checkbox" id="upReplace"> <span>Replace the whole list (people missing from this upload are removed)</span></label>
@@ -95,7 +95,12 @@
         <label class="f" for="aGpay"><span class="label">GPay number</span><input id="aGpay" maxlength="20" autocomplete="off"></label>
         <label class="f" for="aUpi"><span class="label">UPI ID</span><input id="aUpi" maxlength="60" autocomplete="off"></label>
       </div>
-      <div class="actions"><button type="button" id="aSave">Save price and payment details</button></div>
+      <div class="row">
+        <label class="f" for="aSizes"><span class="label">Sizes offered, in order</span><input id="aSizes" autocomplete="off" placeholder="S, M, L, XL, XXL, XXXL"></label>
+        <label class="f" for="aSizePrices"><span class="label">Different price for some sizes (optional)</span><input id="aSizePrices" autocomplete="off" placeholder="XXXL=375"></label>
+      </div>
+      <p class="hint">Add a size by typing it into the list, for example XS or 4XL. A size can be removed only when nobody has ordered it.</p>
+      <div class="actions"><button type="button" id="aSave">Save sizes, prices and payment details</button></div>
       <hr>
       <div class="msg" id="aMsg" role="status"></div>
       <hr>
@@ -119,7 +124,7 @@
       <button class="small" id="copyUpi" type="button">Copy UPI ID</button>
     </div>
   </section>
-  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata · <a href="https://www.facebook.com/girishbhawan" target="_blank" rel="noopener">Girish Bhawan on Facebook</a></footer>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
 </div>
 <script src="/assets/common.js"></script>
 <script src="/assets/tshirt.js"></script>

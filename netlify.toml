@@ -5,14 +5,41 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Old addresses keep working
+[[redirects]]
+  from = "/durga-puja-2026/nirghonto/*"
+  to = "/nirghonto/?e=durga-puja-2026"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/durga-puja-2026/*"
+  to = "/event/?e=durga-puja-2026"
+  status = 302
+  force = true
+
 [[headers]]
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    
 
 [[headers]]
   for = "/tshirt/*"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+
+[[headers]]
+  for = "/section/*"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+
+[[headers]]
+  for = "/account/*"
   [headers.values]
     X-Robots-Tag = "noindex"

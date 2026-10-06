@@ -1,8 +1,8 @@
 
 (function(){
-  var SIZES=["S","M","L","XL","XXL"];
+  var SIZES=["S","M","L","XL","XXL","XXXL"];
   var $=function(id){return document.getElementById(id)};
-  var data={price:0,gpay:"",upi:"",orders:[]},loaded=false;
+  var data={price:0,gpay:"",upi:"",orders:[],sizePrices:{}},loaded=false;
   var admin=false,editing=-1,busy=false,pending=null;
 
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
@@ -15,11 +15,18 @@
   function today(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
   function sizeTotals(){var t={};SIZES.forEach(function(s){t[s]=0});data.orders.forEach(function(o){SIZES.forEach(function(s){t[s]+=n(o[s])})});return t}
 
-  SIZES.forEach(function(s){
-    var l=el("label","f sz");l.htmlFor="fSz"+s;l.appendChild(el("span","label",s));
-    var i=el("input");i.id="fSz"+s;i.type="number";i.min="0";i.step="1";i.inputMode="numeric";i.placeholder="0";
-    i.addEventListener("input",updateFormDue);l.appendChild(i);$("sizeInputs").appendChild(l);
-  });
+  function buildSizeInputs(){
+    var box=$("sizeInputs");box.textContent="";
+    SIZES.forEach(function(s){
+      var l=el("label","f sz");l.htmlFor="fSz"+s;l.appendChild(el("span","label",s));
+      var i=el("input");i.id="fSz"+s;i.type="number";i.min="0";i.step="1";i.inputMode="numeric";i.placeholder="0";
+      i.addEventListener("input",updateFormDue);l.appendChild(i);box.appendChild(l);
+    });
+  }
+  function priceOf(s){return n(data.sizePrices&&data.sizePrices[s])||n(data.price)}
+  function dueOf(o){return SIZES.reduce(function(t,s){return t+n(o[s])*priceOf(s)},0)}
+  function useData(d){data=d;if(!Array.isArray(data.orders))data.orders=[];if(!data.sizePrices)data.sizePrices={};if(Array.isArray(data.sizes)&&data.sizes.length)SIZES=data.sizes;buildSizeInputs()}
+  buildSizeInputs();
 
   function render(){
     var price=n(data.price),t=sizeTotals(),tot=0,due=0,rec=0,paid=0;
@@ -30,7 +37,7 @@
     var rows=$("rows");rows.textContent="";
     if(!data.orders.length){var r1=el("tr");var c1=el("td","empty wide",!loaded?"Loading orders…":admin?"No orders yet. Use Add order, or upload a list in the Admin section.":"No orders have been entered yet.");c1.colSpan=9;r1.appendChild(c1);rows.appendChild(r1)}
     data.orders.forEach(function(o,i){
-      var p=pieces(o),d=p*price,r=n(o.received),st=status(d,r);
+      var p=pieces(o),d=dueOf(o),r=n(o.received),st=status(d,r);
       due+=d;rec+=r;if(st[1]==="paid")paid++;
       var tr=el("tr");
       function cell(cls,label,text){var c=el("td",cls,text);if(label)c.dataset.l=label;tr.appendChild(c);return c}
@@ -52,7 +59,8 @@
       foot.appendChild(f);
     }
     $("sDue").textContent=inr(due);$("sRec").textContent=inr(rec);$("sBal").textContent=inr(due-rec);$("sPaid").textContent=paid+" of "+data.orders.length;
-    $("priceLine").textContent=(price?inr(price)+" per T-shirt. ":"")+"Who ordered which size, and who has paid.";
+    var extra=SIZES.filter(function(s){return priceOf(s)!==price}).map(function(s){return s+" "+inr(priceOf(s))}).join(", ");
+    $("priceLine").textContent=(price?inr(price)+" per T-shirt"+(extra?" ("+extra+")":"")+". ":"")+"Who ordered which size, and who has paid.";
     $("paySec").hidden=!(data.upi||data.gpay);$("gpay").textContent=data.gpay||"–";$("upi").textContent=data.upi||"–";
     $("addBtn").hidden=!admin;$("copySizes").hidden=!admin;$("adminSec").hidden=!admin;
   }
@@ -60,11 +68,12 @@
   /* ---- server calls ---- */
   var MAP={data:"orders",save:"orders"};
   function api(action,body){return GB.api(MAP[action],body)}
-  function fillAdmin(){$("aPrice").value=n(data.price)||"";$("aGpay").value=data.gpay||"";$("aUpi").value=data.upi||""}
+  function fillAdmin(){$("aPrice").value=n(data.price)||"";$("aGpay").value=data.gpay||"";$("aUpi").value=data.upi||"";$("aSizes").value=SIZES.join(", ");
+    $("aSizePrices").value=SIZES.filter(function(s){return data.sizePrices[s]}).map(function(s){return s+"="+data.sizePrices[s]}).join(", ")}
   function save(next,doneMsg,msgNode){
     if(busy)return;busy=true;flash(msgNode,"Saving…");
     api("save",next).then(function(j){
-      data=j.data||next;busy=false;pending=null;closeForm();render();fillAdmin();
+      useData(j.data||next);busy=false;pending=null;closeForm();render();fillAdmin();
       $("upApply").hidden=true;$("upPreview").hidden=true;$("upText").value="";$("upFile").value="";
       flash(msgNode,"");flash($("pageMsg"),doneMsg);
     },function(e){
@@ -87,7 +96,8 @@
 
   /* ---- add / edit one order ---- */
   function formPieces(){return SIZES.reduce(function(t,s){return t+n($("fSz"+s).value)},0)}
-  function updateFormDue(){$("fDue").textContent=inr(formPieces()*n(data.price))}
+  function formDue(){return SIZES.reduce(function(t,s){return t+n($("fSz"+s).value)*priceOf(s)},0)}
+  function updateFormDue(){$("fDue").textContent=inr(formDue())}
   var confirmDelete=false;
   function openForm(i){
     editing=i;confirmDelete=false;var o=i>=0?data.orders[i]:null;
@@ -101,7 +111,7 @@
   function closeForm(){$("orderForm").hidden=true;editing=-1}
   $("addBtn").addEventListener("click",function(){openForm(-1)});
   $("fCancel").addEventListener("click",closeForm);
-  $("fFull").addEventListener("click",function(){$("fRec").value=formPieces()*n(data.price);if(!$("fDate").value)$("fDate").value=today()});
+  $("fFull").addEventListener("click",function(){$("fRec").value=formDue();if(!$("fDate").value)$("fDate").value=today()});
   $("orderForm").addEventListener("submit",function(ev){
     ev.preventDefault();
     var name=$("fName").value.trim();
@@ -132,7 +142,7 @@
     if((m=v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/)))return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
     return ""}
   function parseUpload(text){
-    text=String(text||"").replace(/^﻿/,"");
+    text=String(text||"").replace(/[\u200B-\u200F\u2060\uFEFF]/g,"");
     var lines=text.split(/\r?\n/).filter(function(l){return l.trim()});
     if(!lines.length)return{people:[],skipped:[]};
     var first=lines[0],delim=first.indexOf("\t")>=0?"\t":((first.split(";").length>first.split(",").length)?";":",");
@@ -152,10 +162,12 @@
         if(pieces(p))people.push(p);else skipped.push(name+" (no sizes)");
       });
     }else{
-      var re=/\b(XXL|XL|S|M|L)\s*[-:=x×]?\s*(\d+)/gi;
+      var ALIAS={};["2XL","3XL","4XL"].forEach(function(a,i){var t="XX"+"X".repeat(i)+"L";if(SIZES.indexOf(t)>=0&&SIZES.indexOf(a)<0)ALIAS[a]=t});
+      var toks=SIZES.concat(Object.keys(ALIAS)).sort(function(a,b){return b.length-a.length});
+      var re=new RegExp("\\b("+toks.join("|")+")\\s*[-:;=x×]?\\s*(\\d+)","gi");
       lines.forEach(function(line){
         var l=line.replace(/^\s*\d+\s*[).:\-]\s*/,""),m,firstAt=-1,p={};SIZES.forEach(function(s){p[s]=0});
-        re.lastIndex=0;while((m=re.exec(l))){if(firstAt<0)firstAt=m.index;p[m[1].toUpperCase()]+=n(m[2])}
+        re.lastIndex=0;while((m=re.exec(l))){if(firstAt<0)firstAt=m.index;var z=m[1].toUpperCase();p[ALIAS[z]||z]+=n(m[2])}
         var name=(firstAt<0?l:l.slice(0,firstAt)).replace(/[\s\-:–,]+$/,"").trim();
         if(!name||firstAt<0||!pieces(p)){skipped.push(line.trim());return}
         p.name=name;people.push(p);
@@ -202,6 +214,12 @@
   /* ---- price and payment details ---- */
   $("aSave").addEventListener("click",function(){
     var next=clone(data);next.price=n($("aPrice").value);next.gpay=$("aGpay").value.trim();next.upi=$("aUpi").value.trim();
+    var sizes=$("aSizes").value.split(/[,\s]+/).map(function(x){return x.toUpperCase().replace(/[^A-Z0-9]/g,"")}).filter(function(x,i,a){return x&&a.indexOf(x)===i});
+    if(!sizes.length){flash($("aMsg"),"Enter at least one size.",true);return}
+    var gone=SIZES.filter(function(z){return sizes.indexOf(z)<0&&data.orders.some(function(o){return n(o[z])})});
+    if(gone.length){flash($("aMsg"),"Pieces are ordered in "+gone.join(", ")+". Change those orders first, then remove the size.",true);return}
+    next.sizes=sizes;next.sizePrices={};
+    $("aSizePrices").value.split(/[,;\n]+/).forEach(function(part){var m=/^\s*([A-Za-z0-9]+)\s*[=:\-]\s*(\d+)\s*$/.exec(part);if(m&&sizes.indexOf(m[1].toUpperCase())>=0)next.sizePrices[m[1].toUpperCase()]=n(m[2])});
     save(next,"Price and payment details saved.",$("aMsg"));
   });
 
@@ -209,7 +227,7 @@
   $("dlBtn").addEventListener("click",function(){if(admin)window.location.href="/api/report"});
 
   render();
-  api("data").then(function(j){data=j;if(!Array.isArray(data.orders))data.orders=[];loaded=true;render();fillAdmin()},
+  api("data").then(function(j){useData(j);loaded=true;render();fillAdmin()},
     function(){loaded=true;render();flash($("pageMsg"),"Could not load the order list. Reload the page to try again.",true)});
   GB.onAdmin(function(a){admin=a;if(!a)closeForm();render();if(a)fillAdmin()});
 })();

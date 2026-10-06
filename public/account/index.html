@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Family login · Girish Bhawan</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a><a href="/tshirt/">T-shirt orders</a></nav>
+  </div>
+  <header>
+    <div>
+      <h1>Family login</h1>
+      <p class="sub">Some sections of this site are only for family members. Create an account once; the admin approves it before it works.</p>
+    </div>
+  </header>
+
+  <div class="two" id="guest">
+    <section>
+      <h2>Log in</h2>
+      <form id="loginForm" novalidate>
+        <label class="f" for="lUser"><span class="label">Mobile number or email</span><input id="lUser" autocomplete="username" autocapitalize="none"></label>
+        <label class="f" for="lPass"><span class="label">Password</span><input id="lPass" type="password" autocomplete="current-password"></label>
+        <div class="actions"><button class="primary" type="submit">Log in</button></div>
+        <div class="msg" id="lMsg" role="status"></div>
+        <p class="hint">Forgot your password? Ask the admin to set a new one for you.</p>
+      </form>
+    </section>
+    <section>
+      <h2>Create an account</h2>
+      <form id="regForm" novalidate>
+        <label class="f" for="rName"><span class="label">Your name</span><input id="rName" maxlength="60" autocomplete="name"></label>
+        <label class="f" for="rLogin"><span class="label">Mobile number (with country code) or email</span><input id="rLogin" maxlength="80" autocomplete="username" autocapitalize="none" placeholder="+91 98xxxxxxxx"></label>
+        <label class="f" for="rPass"><span class="label">Choose a password (8 or more characters)</span><input id="rPass" type="password" autocomplete="new-password"></label>
+        <label class="f" for="rWants"><span class="label">Which family group are you part of?</span><select id="rWants"><option value="">Not sure</option></select></label>
+        <label class="f" for="rNote"><span class="label">Note for the admin (optional)</span><input id="rNote" maxlength="200" autocomplete="off" placeholder="For example: Babul's daughter"></label>
+        <label class="trap" aria-hidden="true">Leave this empty<input id="rWebsite" tabindex="-1" autocomplete="off"></label>
+        <div class="actions"><button class="primary" type="submit">Create account</button></div>
+        <div class="msg" id="rMsg" role="status"></div>
+      </form>
+    </section>
+  </div>
+
+  <section id="member" hidden>
+    <div class="admin">
+      <div class="head"><div><strong id="mName"></strong><span class="note" id="mLogin"></span></div><span class="pill" id="mStatus"></span></div>
+      <p class="hint" id="mGroups"></p>
+      <hr>
+      <form id="pwForm" class="stack" novalidate style="border:0;padding:0;background:none">
+        <div class="row">
+          <label class="f" for="pwOld"><span class="label">Current password</span><input id="pwOld" type="password" autocomplete="current-password"></label>
+          <label class="f" for="pwNew"><span class="label">New password (8 or more characters)</span><input id="pwNew" type="password" autocomplete="new-password"></label>
+        </div>
+        <div class="actions"><button type="submit">Change password</button></div>
+        <div class="msg" id="pwMsg" role="status"></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="adminBox" hidden>
+    <p class="notebox">You are logged in as the admin. <a href="/admin/">Open the admin page.</a></p>
+  </section>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/account.js"></script>
+</body>
+</html>
