@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Durga Puja 2026 · Girish Bhawan</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site"><a href="/">Home</a><a href="/durga-puja-2026/" aria-current="page">Durga Puja 2026</a><a href="/durga-puja-2026/nirghonto/">Nirghonto</a><a href="/tshirt/">T-shirt orders</a></nav>
+  </div>
+  <header>
+    <div>
+      <p class="eyebrow" lang="bn">দুর্গাপূজা ২০২৬</p>
+      <h1>Durga Puja 2026</h1>
+      <p class="sub">Photos, links and greetings from the family. The schedule is on the <a href="/durga-puja-2026/nirghonto/">Nirghonto</a> page.</p>
+    </div>
+  </header>
+
+  <section>
+    <h2>Share something</h2>
+    <form id="postForm" novalidate>
+      <div class="row">
+        <label class="f" for="pName"><span class="label">Your name</span><input id="pName" maxlength="40" autocomplete="name"></label>
+        <label class="f" for="pLink"><span class="label">Link to a post or video (optional)</span><input id="pLink" maxlength="300" inputmode="url" placeholder="https://www.facebook.com/..." autocomplete="off"></label>
+      </div>
+      <label class="f" for="pPhoto"><span class="label">Photo (optional)</span><input id="pPhoto" type="file" accept="image/*"></label>
+      <label class="f" for="pComment"><span class="label">Comment</span><textarea id="pComment" rows="3" maxlength="500"></textarea></label>
+      <label class="trap" aria-hidden="true">Leave this empty<input id="pWebsite" tabindex="-1" autocomplete="off"></label>
+      <div class="actions"><button class="primary" type="submit">Post</button><span class="hint" id="modHint">A photo or a link is needed. Posts appear once the admin has approved them.</span></div>
+      <div class="msg" id="pMsg" role="status"></div>
+    </form>
+  </section>
+
+  <section id="wallAdmin" hidden>
+    <div class="admin">
+      <label class="chk" for="autoApprove"><input type="checkbox" id="autoApprove"> <span>Show new posts straight away, without my approval</span></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>From the family</h2>
+    <div class="msg" id="feedMsg" role="status"></div>
+    <div class="feed" id="feed"></div>
+  </section>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata · <a href="https://www.facebook.com/girishbhawan" target="_blank" rel="noopener">Girish Bhawan on Facebook</a></footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/wall.js"></script>
+</body>
+</html>

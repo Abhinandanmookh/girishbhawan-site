@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>GB T-Shirt Orders</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site"><a href="/">Home</a><a href="/durga-puja-2026/">Durga Puja 2026</a><a href="/durga-puja-2026/nirghonto/">Nirghonto</a><a href="/tshirt/" aria-current="page">T-shirt orders</a></nav>
+  </div>
+  <header>
+    <div>
+      <h1>GB T-Shirt Orders</h1>
+      <p class="sub" id="priceLine">Who ordered which size, and who has paid.</p>
+    </div>
+  </header>
+
+  <section aria-label="Money summary">
+    <div class="money">
+      <div><span class="label">Amount due</span><b id="sDue">–</b></div>
+      <div><span class="label">Received</span><b id="sRec">–</b></div>
+      <div><span class="label">Balance</span><b id="sBal">–</b></div>
+      <div><span class="label">Fully paid</span><b id="sPaid">–</b></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Size-wise order for the printer</h2>
+      <button class="small" id="copySizes" type="button" hidden>Copy size list</button>
+    </div>
+    <div class="tags" id="tags"></div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Orders and payments</h2>
+      <button class="primary" id="addBtn" type="button" hidden>Add order</button>
+    </div>
+
+    <form id="orderForm" hidden novalidate>
+      <strong id="formTitle">Add order</strong>
+      <div class="row">
+        <label class="f" for="fName"><span class="label">Name</span><input id="fName" maxlength="60" autocomplete="off"></label>
+        <label class="f" for="fNote"><span class="label">Note (optional)</span><input id="fNote" maxlength="120" autocomplete="off"></label>
+      </div>
+      <div class="row" id="sizeInputs"></div>
+      <div class="row">
+        <label class="f" for="fRec"><span class="label">Amount received (₹)</span><input id="fRec" type="number" min="0" step="1" inputmode="numeric"></label>
+        <label class="f" for="fDate"><span class="label">Payment date</span><input id="fDate" type="date"></label>
+        <div class="f"><span class="label">Amount due</span><div class="actions"><b class="num" id="fDue">₹0</b><button class="small" type="button" id="fFull">Mark full amount received</button></div></div>
+      </div>
+      <div class="actions">
+        <button class="primary" type="submit" id="fSave">Save</button>
+        <button type="button" id="fCancel">Cancel</button>
+        <button type="button" class="danger" id="fDelete" hidden>Delete order</button>
+      </div>
+      <div class="msg" id="fMsg" role="status"></div>
+    </form>
+
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Sizes</th><th class="r">Pieces</th><th class="r">Due</th><th class="r">Received</th><th class="r">Balance</th><th>Status</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+    <div class="msg" id="pageMsg" role="status"></div>
+  </section>
+
+  <section id="adminSec" hidden>
+    <div class="head"><h2>Admin</h2><span class="label">Shown only while you are logged in</span></div>
+    <div class="admin">
+      <div class="f">
+        <label class="label" for="upFile">Upload names and sizes</label>
+        <p class="hint">Choose a CSV file with the columns Name, S, M, L, XL, XXL (Received, Paid on and Note are optional), or paste a list with one person per line. Names already in the table get their sizes updated; new names are added.</p>
+        <input type="file" id="upFile" accept=".csv,.txt,text/csv,text/plain">
+        <textarea id="upText" rows="5" aria-label="Paste a list" placeholder="Sunny - M-1, S-1&#10;Babul - XXL-4"></textarea>
+        <label class="chk" for="upReplace"><input type="checkbox" id="upReplace"> <span>Replace the whole list (people missing from this upload are removed)</span></label>
+        <div class="actions"><button type="button" id="upCheck">Check upload</button><button type="button" class="primary" id="upApply" hidden>Save to page</button></div>
+        <div class="msg" id="upMsg" role="status"></div>
+        <ul class="preview" id="upPreview" hidden></ul>
+      </div>
+      <hr>
+      <div class="row">
+        <label class="f" for="aPrice"><span class="label">Price per T-shirt (₹)</span><input id="aPrice" type="number" min="0" step="1" inputmode="numeric"></label>
+        <label class="f" for="aGpay"><span class="label">GPay number</span><input id="aGpay" maxlength="20" autocomplete="off"></label>
+        <label class="f" for="aUpi"><span class="label">UPI ID</span><input id="aUpi" maxlength="60" autocomplete="off"></label>
+      </div>
+      <div class="actions"><button type="button" id="aSave">Save price and payment details</button></div>
+      <hr>
+      <div class="msg" id="aMsg" role="status"></div>
+      <hr>
+      <div class="actions"><button type="button" class="primary" id="dlBtn">Download report (CSV)</button></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The T-shirt design</h2>
+    <figure class="design">
+      <img src="/assets/design.jpg" loading="lazy" alt="Cream T-shirt printed in red: Durga on the front, the Girish Bhawan facade on the back, and the গিরিশ ভবন logo on both sleeves" width="1000" height="666">
+      <figcaption>Planned design. Front: Durga. Back: the Girish Bhawan facade. Sleeves: the গিরিশ ভবন logo.</figcaption>
+    </figure>
+  </section>
+
+  <section id="paySec" hidden>
+    <h2>Where to pay</h2>
+    <div class="pay">
+      <div><span class="label">GPay number</span><code id="gpay"></code></div>
+      <div><span class="label">UPI ID</span><code id="upi"></code></div>
+      <button class="small" id="copyUpi" type="button">Copy UPI ID</button>
+    </div>
+  </section>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata · <a href="https://www.facebook.com/girishbhawan" target="_blank" rel="noopener">Girish Bhawan on Facebook</a></footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/tshirt.js"></script>
+</body>
+</html>

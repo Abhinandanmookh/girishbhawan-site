@@ -1,0 +1,7 @@
+{
+  "name": "girish-bhawan-site",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "dependencies": { "@netlify/blobs": "^11.1.3" }
+}
