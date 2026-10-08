@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>GB T-Shirt Orders</title>
+<title>GB Dress Orders</title>
 <link rel="icon" href="/assets/favicon.png">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
@@ -14,11 +14,12 @@
 <div class="wrap">
   <div class="site-head">
     <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
-    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a><a href="/tshirt/">T-shirt orders</a></nav>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a><a href="/tshirt/">Dress orders</a></nav>
   </div>
   <header>
     <div>
-      <h1>GB T-Shirt Orders</h1>
+      <nav class="tabs" id="itemTabs" aria-label="Dress type" hidden></nav>
+      <h1 id="pageTitle">GB T-Shirt Orders</h1>
       <p class="sub" id="priceLine">Who ordered which size, and who has paid.</p>
     </div>
   </header>
@@ -91,7 +92,7 @@
       </div>
       <hr>
       <div class="row">
-        <label class="f" for="aPrice"><span class="label">Price per T-shirt (₹)</span><input id="aPrice" type="number" min="0" step="1" inputmode="numeric"></label>
+        <label class="f" for="aPrice"><span class="label" id="priceLabel">Price per T-shirt (₹)</span><input id="aPrice" type="number" min="0" step="1" inputmode="numeric"></label>
         <label class="f" for="aGpay"><span class="label">GPay number</span><input id="aGpay" maxlength="20" autocomplete="off"></label>
         <label class="f" for="aUpi"><span class="label">UPI ID</span><input id="aUpi" maxlength="60" autocomplete="off"></label>
       </div>
@@ -104,11 +105,26 @@
       <hr>
       <div class="msg" id="aMsg" role="status"></div>
       <hr>
-      <div class="actions"><button type="button" class="primary" id="dlBtn">Download report (CSV)</button></div>
+      <div class="actions"><button type="button" class="primary" id="dlBtn">Download report (CSV)</button><button type="button" id="dlAll">Download combined report, all dress types (CSV)</button></div>
+      <p class="hint">The combined report has one row per person with their pieces and amount for each dress type. It matches people by name, so spell a name the same way in each list.</p>
+      <hr>
+      <div class="f">
+        <span class="label">Dress types</span>
+        <div class="row">
+          <label class="f" for="tThis"><span class="label">Name of this type</span><input id="tThis" maxlength="40" autocomplete="off"></label>
+          <div class="f"><span class="label">&nbsp;</span><div class="actions"><button type="button" id="tRename">Rename</button><button type="button" class="danger" id="tRemove">Remove this type</button></div></div>
+        </div>
+        <div class="row">
+          <label class="f" for="tName"><span class="label">Add another type</span><input id="tName" maxlength="40" autocomplete="off" placeholder="For example: Kurta, Saree, Cap"></label>
+          <label class="f" for="tPrice"><span class="label">Its price (₹)</span><input id="tPrice" type="number" min="0" step="1" inputmode="numeric"></label>
+          <div class="f"><span class="label">&nbsp;</span><div class="actions"><button type="button" id="tAdd">Add type</button></div></div>
+        </div>
+        <div class="msg" id="tMsg" role="status"></div>
+      </div>
     </div>
   </section>
 
-  <section>
+  <section id="designSec">
     <h2>The T-shirt design</h2>
     <figure class="design">
       <img src="/assets/design.jpg" loading="lazy" alt="Cream T-shirt printed in red: Durga on the front, the Girish Bhawan facade on the back, and the গিরিশ ভবন logo on both sleeves" width="1000" height="666">

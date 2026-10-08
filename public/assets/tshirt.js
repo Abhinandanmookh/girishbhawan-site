@@ -25,7 +25,8 @@
   }
   function priceOf(s){return n(data.sizePrices&&data.sizePrices[s])||n(data.price)}
   function dueOf(o){return SIZES.reduce(function(t,s){return t+n(o[s])*priceOf(s)},0)}
-  function useData(d){data=d;if(!Array.isArray(data.orders))data.orders=[];if(!data.sizePrices)data.sizePrices={};if(Array.isArray(data.sizes)&&data.sizes.length)SIZES=data.sizes;buildSizeInputs()}
+  function useData(d){if(d.items){ITEMS=d.items;ITEM=d.item.id;NAME=d.item.name;if($("tThis"))$("tThis").value=NAME}
+    data=d;if(!Array.isArray(data.orders))data.orders=[];if(!data.sizePrices)data.sizePrices={};if(Array.isArray(data.sizes)&&data.sizes.length)SIZES=data.sizes;buildSizeInputs()}
   buildSizeInputs();
 
   function render(){
@@ -60,14 +61,15 @@
     }
     $("sDue").textContent=inr(due);$("sRec").textContent=inr(rec);$("sBal").textContent=inr(due-rec);$("sPaid").textContent=paid+" of "+data.orders.length;
     var extra=SIZES.filter(function(s){return priceOf(s)!==price}).map(function(s){return s+" "+inr(priceOf(s))}).join(", ");
-    $("priceLine").textContent=(price?inr(price)+" per T-shirt"+(extra?" ("+extra+")":"")+". ":"")+"Who ordered which size, and who has paid.";
+    $("priceLine").textContent=(price?inr(price)+" per "+NAME+(extra?" ("+extra+")":"")+". ":"")+"Who ordered which size, and who has paid.";
+    drawItems();
     $("paySec").hidden=!(data.upi||data.gpay);$("gpay").textContent=data.gpay||"–";$("upi").textContent=data.upi||"–";
     $("addBtn").hidden=!admin;$("copySizes").hidden=!admin;$("adminSec").hidden=!admin;
   }
 
   /* ---- server calls ---- */
-  var MAP={data:"orders",save:"orders"};
-  function api(action,body){return GB.api(MAP[action],body)}
+  var ITEM=GB.qs("i"),ITEMS=[],NAME="T-shirt";
+  function api(action,body){return GB.api("orders"+(ITEM?"?i="+encodeURIComponent(ITEM):""),body)}
   function fillAdmin(){$("aPrice").value=n(data.price)||"";$("aGpay").value=data.gpay||"";$("aUpi").value=data.upi||"";$("aSizes").value=SIZES.join(", ");
     $("aSizePrices").value=SIZES.filter(function(s){return data.sizePrices[s]}).map(function(s){return s+"="+data.sizePrices[s]}).join(", ")}
   function save(next,doneMsg,msgNode){
@@ -89,7 +91,7 @@
     try{navigator.clipboard.writeText(text).then(function(){var o=btn.textContent;btn.textContent="Copied";setTimeout(function(){btn.textContent=o},1600)},fail)}catch(e){fail()}
   }
   $("copySizes").addEventListener("click",function(){
-    var t=sizeTotals(),tot=0,lines=["GB T-Shirt order"];
+    var t=sizeTotals(),tot=0,lines=["GB "+NAME+" order"];
     SIZES.forEach(function(s){tot+=t[s];lines.push(s+" - "+t[s])});lines.push("Total - "+tot);copy(lines.join("\n"),this);
   });
   $("copyUpi").addEventListener("click",function(){copy($("upi").textContent,this)});
@@ -224,7 +226,32 @@
   });
 
   /* ---- report download: the server only sends it to a logged-in admin ---- */
-  $("dlBtn").addEventListener("click",function(){if(admin)window.location.href="/api/report"});
+  $("dlBtn").addEventListener("click",function(){if(admin)window.location.href="/api/report?i="+encodeURIComponent(ITEM)});
+  $("dlAll").addEventListener("click",function(){if(admin)window.location.href="/api/report?i=all"});
+
+  /* ---- dress types: tabs, add, rename, remove ---- */
+  function drawItems(){
+    var tabs=$("itemTabs");tabs.textContent="";
+    ITEMS.forEach(function(it){var a=el("a",null,it.name);a.href="/tshirt/?i="+encodeURIComponent(it.id);if(it.id===ITEM)a.setAttribute("aria-current","page");tabs.appendChild(a)});
+    tabs.hidden=ITEMS.length<2;
+    $("pageTitle").textContent="GB "+NAME+" Orders";document.title="GB "+NAME+" Orders";
+    $("priceLabel").textContent="Price per "+NAME+" (\u20B9)";$("dlBtn").textContent="Download "+NAME+" report (CSV)";
+    $("designSec").hidden=ITEM!=="tshirt";
+  }
+  function itemCall(body,done){
+    flash($("tMsg"),"Saving\u2026");
+    GB.api("orders/items",body).then(done,function(e){
+      flash($("tMsg"),e.code==="name"?"Enter a name.":e.code==="has orders"?"This type has orders in it. Delete those orders first.":e.code==="last"?"At least one dress type has to stay.":e.status===401?"Your admin session has ended. Log in again.":"That did not work. Try again.",true)});
+  }
+  $("tAdd").addEventListener("click",function(){
+    itemCall({action:"add",name:$("tName").value,price:n($("tPrice").value)},function(j){location.href="/tshirt/?i="+encodeURIComponent(j.id)});
+  });
+  $("tRename").addEventListener("click",function(){itemCall({action:"rename",id:ITEM,name:$("tThis").value},function(){location.reload()})});
+  var tArmed=false;
+  $("tRemove").addEventListener("click",function(){
+    if(!tArmed){tArmed=true;this.textContent="Confirm remove";return}
+    itemCall({action:"remove",id:ITEM},function(){location.href="/tshirt/"});
+  });
 
   render();
   api("data").then(function(j){useData(j);loaded=true;render();fillAdmin()},

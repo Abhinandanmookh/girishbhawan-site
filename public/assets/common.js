@@ -28,7 +28,7 @@ window.GB = (function () {
       nav.textContent = "";
       var items = [["/", "Home"]];
       site.events.forEach(function (e) { items.push(["/event/?e=" + e.id, e.title]); });
-      items.push(["/tshirt/", "T-shirt orders"]);
+      items.push(["/tshirt/", "Dress orders"]);
       site.sections.forEach(function (s) { items.push(["/section/?s=" + s.id, s.title]); });
       items.forEach(function (it) { var a = link(it[0], it[1]); if (it[0] === here || (it[0] === "/" && location.pathname === "/")) a.setAttribute("aria-current", "page"); nav.appendChild(a); });
     }

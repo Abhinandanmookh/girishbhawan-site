@@ -7,7 +7,7 @@ Site for girishbhawanofficial.com, hosted on Netlify.
 - `/` home
 - `/event/?e=...` photo wall for an event (Durga Puja 2026 to start with)
 - `/nirghonto/?e=...` schedule for an event, with the Nirghonto card image
-- `/tshirt/` T-shirt orders, payments and the size-wise count for the printer
+- `/tshirt/` dress orders (T-shirt, Kurti and any type you add): payments and the size-wise count for the printer
 - `/section/?s=...` documents (Pujo Accounts, Bhog Accounts, and any you add)
 - `/account/` family members register and log in
 - `/admin/` approve members, manage groups, sections, events, links and backups
@@ -19,7 +19,8 @@ Pages are plain HTML in `public/`. One Netlify Function (`netlify/functions/api.
 
 | Change | Where |
 |---|---|
-| T-shirt sizes, price, a different price for one size, GPay/UPI | T-shirt page, Admin section |
+| Sizes, price, a different price for one size, GPay/UPI, for each dress type | Dress orders page, Admin section |
+| Add a dress type (Kurti, Kurta, anything) with its own price, sizes, orders and report | Dress orders page, Admin section |
 | Add an event (next year's Pujo, Jagaddhatri Puja), who can see it, who can post | Admin page, Events |
 | Add a documents section and choose which groups can open it | Admin page, Sections |
 | Add or rename family groups | Admin page, Family groups |

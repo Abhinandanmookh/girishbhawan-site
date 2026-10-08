@@ -156,3 +156,6 @@ input.narrow{max-width:280px}
 .filebox{background:var(--surface);border:1px solid var(--line);border-radius:8px}
 .filebox .empty{margin:0}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start}
+.tabs{margin-bottom:10px}
+.tabs a{padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.tabs a[aria-current="page"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}

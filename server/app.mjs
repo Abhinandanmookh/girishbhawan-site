@@ -21,6 +21,12 @@ const DEFAULT_SITE = {
   ],
   events: [{ id: LEGACY, title: "Durga Puja 2026", sub: "Photos, links and greetings from the family.", schedule: true, access: "public", groups: [], post: "anyone", autoApprove: false }],
 };
+const DEFAULT_ITEMS = [{ id: "tshirt", name: "T-shirt" }, { id: "kurti", name: "Kurti" }];
+function cleanItems(v) {
+  const out = [], taken = new Set();
+  for (const it of Array.isArray(v) ? v.slice(0, 12) : []) { const name = txt(it?.name, 40); if (name) out.push({ id: uniqueId(it?.id, name, taken, "item"), name }); }
+  return out.length ? out : DEFAULT_ITEMS.map((x) => ({ ...x }));
+}
 const FILE_TYPES = {
   pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", csv: "text/csv", txt: "text/plain",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xls: "application/vnd.ms-excel",
@@ -239,29 +245,102 @@ export function createApp(getStore, env) {
         return json(200, { ok: true }, { "set-cookie": session(u.id, u.pv) });
       }
 
-      /* ---------- T-shirt orders ---------- */
-      if (route === "orders" && GET) return json(200, cleanOrders((await s.get("orders", { type: "json" })) || DEFAULT_ORDERS));
-      if (route === "orders" && POST) {
-        const b = await body(req);
-        if (!b) return json(400, { error: "bad request" });
-        if (!admin) return deny();
-        const d = cleanOrders(b);
-        await s.setJSON("orders", d);
-        return json(200, { ok: true, data: d });
-      }
-      if (route === "report" && GET) {
-        if (!admin) return new Response("Admin login required.", { status: 401, headers: { "content-type": "text/plain; charset=utf-8" } });
-        const d = cleanOrders((await s.get("orders", { type: "json" })) || DEFAULT_ORDERS), Z = d.sizes;
-        const priceOf = (z) => d.sizePrices[z] || d.price;
-        const rows = [["Name", ...Z, "Pieces", "Amount due", "Received", "Balance", "Status", "Paid on", "Note"]];
-        const tot = Object.fromEntries(Z.map((z) => [z, 0])); let tp = 0, td = 0, tr = 0;
-        for (const o of d.orders) {
-          const p = Z.reduce((t, z) => t + o[z], 0), due = Z.reduce((t, z) => t + o[z] * priceOf(z), 0), r = o.received;
-          Z.forEach((z) => (tot[z] += o[z])); tp += p; td += due; tr += r;
-          rows.push([o.name, ...Z.map((z) => o[z]), p, due, r, due - r, due > 0 && r >= due ? "Paid" : r > 0 ? "Part paid" : "Pending", o.paidOn, o.note]);
+      /* ---------- dress orders: one tracker per dress type (T-shirt, Kurti, ...) ---------- */
+      if (route === "orders" || route === "report") {
+        const items = cleanItems((await s.get("order-items", { type: "json" })) || DEFAULT_ITEMS);
+        const ordersKey = (id) => (id === "tshirt" ? "orders" : "orders/" + id);
+        const getOrders = async (id) => {
+          const raw = await s.get(ordersKey(id), { type: "json" });
+          if (raw) return cleanOrders(raw);
+          if (id === "tshirt") return cleanOrders(DEFAULT_ORDERS);
+          const base = cleanOrders((await s.get("orders", { type: "json" })) || DEFAULT_ORDERS); // new types start with the same payment details
+          return cleanOrders({ price: id === "kurti" ? 525 : 0, gpay: base.gpay, upi: base.upi, sizes: DEFAULT_SIZES, orders: [] });
+        };
+        const statusOf = (due, r) => (due > 0 && r >= due ? "Paid" : r > 0 ? "Part paid" : "Pending");
+        const dueOf = (d, o) => d.sizes.reduce((t, z) => t + o[z] * (d.sizePrices[z] || d.price), 0);
+        const piecesOf = (d, o) => d.sizes.reduce((t, z) => t + o[z], 0);
+        const id = url.searchParams.get("i") || items[0].id, item = items.find((x) => x.id === id);
+
+        if (route === "orders" && GET) {
+          if (!item) return json(404, { error: "no such item" });
+          return json(200, { ...(await getOrders(id)), items, item });
         }
-        rows.push(["TOTAL", ...Z.map((z) => tot[z]), tp, td, tr, td - tr, "", "", ""]);
-        return new Response(csv(rows), { status: 200, headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="GB-TShirt-Orders-${new Date().toISOString().slice(0, 10)}.csv"`, "cache-control": "no-store" } });
+        if (route === "orders" && POST) {
+          const b = await body(req);
+          if (!b) return json(400, { error: "bad request" });
+          if (!admin) return deny();
+          if (seg[1] === "items") {
+            if (b.action === "add") {
+              const name = txt(b.name, 40);
+              if (!name) return json(400, { error: "name" });
+              if (items.length >= 12) return json(400, { error: "too many" });
+              const nid = uniqueId("", name, new Set(items.map((x) => x.id)), "item");
+              const base = await getOrders(items[0].id);
+              await s.setJSON(ordersKey(nid), cleanOrders({ price: b.price, gpay: base.gpay, upi: base.upi, sizes: DEFAULT_SIZES, orders: [] }));
+              await s.setJSON("order-items", items.concat([{ id: nid, name }]));
+              return json(200, { ok: true, id: nid });
+            }
+            const target = items.find((x) => x.id === b.id);
+            if (!target) return json(404, { error: "no such item" });
+            if (b.action === "rename") {
+              const name = txt(b.name, 40);
+              if (!name) return json(400, { error: "name" });
+              target.name = name; await s.setJSON("order-items", items);
+              return json(200, { ok: true });
+            }
+            if (b.action === "remove") {
+              if (items.length < 2) return json(400, { error: "last" });
+              if ((await getOrders(target.id)).orders.length) return json(409, { error: "has orders" });
+              await s.setJSON("order-items", items.filter((x) => x.id !== target.id));
+              return json(200, { ok: true });
+            }
+            return json(400, { error: "action" });
+          }
+          if (!item) return json(404, { error: "no such item" });
+          const d = cleanOrders(b);
+          await s.setJSON(ordersKey(id), d);
+          return json(200, { ok: true, data: { ...d, items, item } });
+        }
+        if (route === "report" && GET) {
+          if (!admin) return new Response("Admin login required.", { status: 401, headers: { "content-type": "text/plain; charset=utf-8" } });
+          const day = new Date().toISOString().slice(0, 10);
+          const send = (rows, name) => new Response(csv(rows), { status: 200, headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="GB-${name}-Orders-${day}.csv"`, "cache-control": "no-store" } });
+          if (id === "all") {
+            // One row per person across every dress type, matched on the name as typed (ignoring case and spaces).
+            // "Sunny" and "Sunny (Abhinandan)" count as one person; "Didi (Munai)" and "Didi (Tuli)" stay separate.
+            const docs = await Promise.all(items.map((x) => getOrders(x.id))), list = [];
+            const norm = (v) => v.toLowerCase().replace(/\s+/g, "");
+            docs.forEach((d, n) => d.orders.forEach((o) => {
+              const full = norm(o.name), base = norm(o.name.replace(/\(.*?\)/g, ""));
+              let r = list.find((x) => x.full === full) || list.find((x) => x.base === base && (x.full === x.base || full === base));
+              if (!r) { r = { name: o.name, full, base, p: items.map(() => 0), due: items.map(() => 0), rec: 0 }; list.push(r); }
+              else if (o.name.length > r.name.length) { r.name = o.name; r.full = full; }
+              r.p[n] += piecesOf(d, o); r.due[n] += dueOf(d, o); r.rec += o.received;
+            }));
+            const people = { values: () => list };
+            const rows = [["Name", ...items.flatMap((x) => [x.name + " pieces", x.name + " amount"]), "Total pieces", "Total due", "Received", "Balance", "Status"]];
+            const T = { p: items.map(() => 0), due: items.map(() => 0), rec: 0 };
+            for (const r of people.values()) {
+              const tp = r.p.reduce((a, c) => a + c, 0), td = r.due.reduce((a, c) => a + c, 0);
+              items.forEach((_, n) => { T.p[n] += r.p[n]; T.due[n] += r.due[n]; }); T.rec += r.rec;
+              rows.push([r.name, ...items.flatMap((_, n) => [r.p[n], r.due[n]]), tp, td, r.rec, td - r.rec, statusOf(td, r.rec)]);
+            }
+            const gp = T.p.reduce((a, c) => a + c, 0), gd = T.due.reduce((a, c) => a + c, 0);
+            rows.push(["TOTAL", ...items.flatMap((_, n) => [T.p[n], T.due[n]]), gp, gd, T.rec, gd - T.rec, ""]);
+            return send(rows, "All");
+          }
+          if (!item) return json(404, { error: "no such item" });
+          const d = await getOrders(id), Z = d.sizes;
+          const rows = [["Name", ...Z, "Pieces", "Amount due", "Received", "Balance", "Status", "Paid on", "Note"]];
+          const tot = Object.fromEntries(Z.map((z) => [z, 0])); let tp = 0, td = 0, tr = 0;
+          for (const o of d.orders) {
+            const pc = piecesOf(d, o), due = dueOf(d, o), r = o.received;
+            Z.forEach((z) => (tot[z] += o[z])); tp += pc; td += due; tr += r;
+            rows.push([o.name, ...Z.map((z) => o[z]), pc, due, r, due - r, statusOf(due, r), o.paidOn, o.note]);
+          }
+          rows.push(["TOTAL", ...Z.map((z) => tot[z]), tp, td, tr, td - tr, "", "", ""]);
+          return send(rows, item.name.replace(/[^A-Za-z0-9]+/g, "") || "Dress");
+        }
       }
 
       /* ---------- events: photo wall and Nirghonto ---------- */
