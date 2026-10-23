@@ -1,5 +1,5 @@
 (function () {
-  var $ = GB.$, el = GB.el, flash = GB.flash, site = null, users = [];
+  var $ = GB.$, el = GB.el, flash = GB.flash, site = null, users = [], requests = [];
   var ACCESS = [["admin", "Admin only"], ["groups", "Selected groups"], ["members", "All approved members"], ["public", "Everyone, no login"]];
 
   function input(value, onchange, attrs) { var i = el("input"); i.value = value || ""; for (var k in attrs || {}) i.setAttribute(k, attrs[k]); i.addEventListener("input", function () { onchange(i.value); }); return i; }
@@ -50,6 +50,27 @@
       card.appendChild(reset);
       box.appendChild(card);
     });
+  }
+
+  /* ---------- album download requests ---------- */
+  function renderRequests() {
+    var box = $("requests"); box.textContent = "";
+    if (!requests.length) { box.appendChild(el("p", "empty", "No requests waiting.")); return; }
+    requests.forEach(function (r) {
+      var u = users.filter(function (x) { return x.id === r.uid; })[0], ev = site.events.filter(function (x) { return x.id === r.e; })[0];
+      var card = el("div", "admin"), head = el("div", "head"), t = el("div");
+      t.appendChild(el("strong", null, (u ? u.name : "A member") + " wants to download the " + (ev ? ev.title : r.e) + " album"));
+      t.appendChild(el("span", "note", "Asked " + GB.when(r.ts)));
+      head.appendChild(t); card.appendChild(head);
+      var act = el("div", "actions");
+      act.appendChild(button("Approve", "small primary", function () { reqAction(r, "approve"); }));
+      act.appendChild(button("Decline", "small", function () { reqAction(r, "decline"); }));
+      card.appendChild(act); box.appendChild(card);
+    });
+  }
+  function reqAction(r, action) {
+    GB.api("admin/request", { e: r.e, uid: r.uid, action: action }).then(function () { flash($("rqMsg"), action === "approve" ? "Access given." : "Request declined."); load(); },
+      function () { flash($("rqMsg"), "That did not work. Try again.", true); });
   }
 
   /* ---------- settings: groups, sections, events, links ---------- */
@@ -131,6 +152,7 @@
   $("bkGet").addEventListener("click", function () {
     flash($("bkMsg"), "Collecting the data…");
     GB.api("admin/backup").then(function (bk) {
+      if ($("bkSlim").checked) bk.blobs = bk.blobs.filter(function (k) { return !/^album\/[^/]+\/orig\//.test(k); });
       var files = [{ name: "data.json", data: new TextEncoder().encode(JSON.stringify(bk)) }], i = 0;
       function next() {
         if (i >= bk.blobs.length) return Promise.resolve();
@@ -166,7 +188,7 @@
   });
 
   function load() {
-    return GB.api("admin/state").then(function (j) { site = j.site; users = j.users; $("adminBody").hidden = false; $("adminGate").hidden = true; renderUsers(); renderSite(); },
+    return GB.api("admin/state").then(function (j) { site = j.site; users = j.users; requests = j.requests || []; renderRequests(); $("adminBody").hidden = false; $("adminGate").hidden = true; renderUsers(); renderSite(); },
       function () { $("adminBody").hidden = true; $("adminGate").hidden = false; });
   }
   GB.ready.then(load);

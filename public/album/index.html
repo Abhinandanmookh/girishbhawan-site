@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Photos and videos · Girish Bhawan</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a></nav>
+  </div>
+  <header>
+    <div>
+      <nav class="tabs" id="evTabs" aria-label="Event pages" hidden></nav>
+      <h1 id="evTitle">Photos and videos</h1>
+      <p class="sub">Previews carry a small Girish Bhawan mark. Full-size photos can be downloaded by family members the admin has approved.</p>
+    </div>
+  </header>
+
+  <p class="notebox" id="dlState" hidden></p>
+
+  <section id="upSec" hidden>
+    <h2>Add to the album</h2>
+    <div class="two">
+      <form id="phForm" novalidate>
+        <strong>Photos</strong>
+        <label class="f" for="phFiles"><span class="label">Choose one or more photos</span><input type="file" id="phFiles" accept="image/*" multiple></label>
+        <label class="f" for="phCap"><span class="label">Caption (optional, applies to all)</span><input id="phCap" maxlength="300" autocomplete="off" placeholder="For example: Saptami arati"></label>
+        <div class="actions"><button class="primary" type="submit">Upload photos</button></div>
+        <div class="msg" id="phMsg" role="status"></div>
+      </form>
+      <form id="vdForm" novalidate>
+        <strong>Video</strong>
+        <label class="f" for="vdLink"><span class="label">Google Drive or YouTube link</span><input id="vdLink" inputmode="url" autocomplete="off" placeholder="https://drive.google.com/..."></label>
+        <label class="f" for="vdFile"><span class="label">The same video from your phone (optional, for the thumbnail)</span><input type="file" id="vdFile" accept="video/*"></label>
+        <label class="f" for="vdCap"><span class="label">Caption (optional)</span><input id="vdCap" maxlength="300" autocomplete="off"></label>
+        <p class="hint">Videos stay in Google Drive or YouTube; the file you choose is only used to make the thumbnail and is not uploaded. In Drive, keep the video "Restricted" and people will see a Request access button.</p>
+        <div class="actions"><button class="primary" type="submit">Add video</button></div>
+        <div class="msg" id="vdMsg" role="status"></div>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="msg" id="pageMsg" role="status"></div>
+    <div class="gallery no-save" id="grid"></div>
+  </section>
+
+  <dialog id="lb" class="lightbox no-save" aria-label="Photo">
+    <div class="lb-top"><button type="button" class="small" id="lbClose">Close</button></div>
+    <div id="lbMedia"></div>
+    <p class="post-text" id="lbCap"></p>
+    <p class="post-meta" id="lbMeta"></p>
+    <div class="actions" id="lbAct"></div>
+    <div class="msg" id="lbMsg" role="status"></div>
+  </dialog>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/album.js"></script>
+</body>
+</html>

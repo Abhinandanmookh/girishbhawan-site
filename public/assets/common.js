@@ -28,7 +28,7 @@ window.GB = (function () {
       nav.textContent = "";
       var items = [["/", "Home"]];
       site.events.forEach(function (e) { items.push(["/event/?e=" + e.id, e.title]); });
-      items.push(["/tshirt/", "Dress orders"]);
+      if (me.admin || (me.user && me.user.status === "active")) items.push(["/tshirt/", "Dress orders"]);
       site.sections.forEach(function (s) { items.push(["/section/?s=" + s.id, s.title]); });
       items.forEach(function (it) { var a = link(it[0], it[1]); if (it[0] === here || (it[0] === "/" && location.pathname === "/")) a.setAttribute("aria-current", "page"); nav.appendChild(a); });
     }
@@ -47,6 +47,17 @@ window.GB = (function () {
         foot.appendChild(out);
       } else foot.appendChild(link("/account/", "Log in or register"));
     }
+  }
+  /* Tabs shown on every event page: family posts, photos and videos, Nirghonto */
+  function eventTabs(E, current) {
+    var box = $("evTabs"); if (!box || !site) return null;
+    var ev = site.events.filter(function (x) { return x.id === E; })[0]; if (!ev) return null;
+    var q = "?e=" + encodeURIComponent(E), tabs = [["/event/", "From the family", "wall"], ["/album/", "Photos and videos", "album"]];
+    if (ev.schedule) tabs.push(["/nirghonto/", "Nirghonto", "nirghonto"]);
+    box.textContent = "";
+    tabs.forEach(function (t) { var a = link(t[0] + q, t[1]); if (t[2] === current) a.setAttribute("aria-current", "page"); box.appendChild(a); });
+    box.hidden = false;
+    return ev;
   }
   function fire() { subs.forEach(function (f) { f(me.admin); }); }
   function onAdmin(f) { subs.push(f); f(me.admin); }
@@ -76,6 +87,7 @@ window.GB = (function () {
 
   draw();
   var ready = api("site").then(function (j) { site = j; me = j.me; draw(); fire(); return j; }, function () { return null; });
-  return { api: api, el: el, flash: flash, qs: qs, when: when, onAdmin: onAdmin, setAdmin: setAdmin, shrink: shrink, ready: ready, $: $,
+  return { api: api, el: el, flash: flash, qs: qs, when: when, onAdmin: onAdmin, setAdmin: setAdmin, shrink: shrink, ready: ready, $: $, eventTabs: eventTabs,
+    member: function () { return !!(me.user && me.user.status === "active"); },
     me: function () { return me; }, site: function () { return site; } };
 })();

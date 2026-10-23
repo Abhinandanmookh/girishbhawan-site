@@ -25,7 +25,7 @@
   }
   function priceOf(s){return n(data.sizePrices&&data.sizePrices[s])||n(data.price)}
   function dueOf(o){return SIZES.reduce(function(t,s){return t+n(o[s])*priceOf(s)},0)}
-  function useData(d){if(d.items){ITEMS=d.items;ITEM=d.item.id;NAME=d.item.name;if($("tThis"))$("tThis").value=NAME}
+  function useData(d){if(d.items){ITEMS=d.items;ITEM=d.item.id;NAME=d.item.name;if($("tThis")){$("tThis").value=NAME;$("tDesc").value=d.item.desc||"";$("tAvail").checked=d.item.available!==false;$("tImgRemove").hidden=!d.item.image}}
     data=d;if(!Array.isArray(data.orders))data.orders=[];if(!data.sizePrices)data.sizePrices={};if(Array.isArray(data.sizes)&&data.sizes.length)SIZES=data.sizes;buildSizeInputs()}
   buildSizeInputs();
 
@@ -246,7 +246,14 @@
   $("tAdd").addEventListener("click",function(){
     itemCall({action:"add",name:$("tName").value,price:n($("tPrice").value)},function(j){location.href="/tshirt/?i="+encodeURIComponent(j.id)});
   });
-  $("tRename").addEventListener("click",function(){itemCall({action:"rename",id:ITEM,name:$("tThis").value},function(){location.reload()})});
+  $("tRename").addEventListener("click",function(){itemCall({action:"update",id:ITEM,name:$("tThis").value,desc:$("tDesc").value,available:$("tAvail").checked},function(){location.reload()})});
+  $("tImgSave").addEventListener("click",function(){
+    var f=$("tImg").files&&$("tImg").files[0];if(!f){flash($("tMsg"),"Choose a picture first.",true);return}
+    flash($("tMsg"),"Uploading\u2026");
+    GB.shrink(f,[[1400,0.85],[1100,0.8],[900,0.75]],1900000).then(function(photo){return GB.api("orders/items",{action:"image",id:ITEM,photo:photo})})
+      .then(function(){location.reload()},function(){flash($("tMsg"),"Could not upload that picture. Try a JPG or PNG.",true)});
+  });
+  $("tImgRemove").addEventListener("click",function(){itemCall({action:"image",id:ITEM,remove:true},function(){location.reload()})});
   var tArmed=false;
   $("tRemove").addEventListener("click",function(){
     if(!tArmed){tArmed=true;this.textContent="Confirm remove";return}
@@ -255,6 +262,8 @@
 
   render();
   api("data").then(function(j){useData(j);loaded=true;render();fillAdmin()},
-    function(){loaded=true;render();flash($("pageMsg"),"Could not load the order list. Reload the page to try again.",true)});
+    function(e){loaded=true;
+      if(e.status===401||e.status===403){$("ordersBody").hidden=true;$("gate").hidden=false;return}
+      render();flash($("pageMsg"),"Could not load the order list. Reload the page to try again.",true)});
   GB.onAdmin(function(a){admin=a;if(!a)closeForm();render();if(a)fillAdmin()});
 })();

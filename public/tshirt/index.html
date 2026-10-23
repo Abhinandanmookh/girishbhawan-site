@@ -14,7 +14,7 @@
 <div class="wrap">
   <div class="site-head">
     <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
-    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a><a href="/tshirt/">Dress orders</a></nav>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a></nav>
   </div>
   <header>
     <div>
@@ -24,6 +24,8 @@
     </div>
   </header>
 
+  <p class="notebox" id="gate" hidden>Orders and payments are for family members. <a href="/account/">Log in</a> with an approved account to see them. What is available to order is on the <a href="/">home page</a>.</p>
+  <div id="ordersBody" class="stack" style="gap:32px">
   <section aria-label="Money summary">
     <div class="money">
       <div><span class="label">Amount due</span><b id="sDue">–</b></div>
@@ -112,7 +114,13 @@
         <span class="label">Dress types</span>
         <div class="row">
           <label class="f" for="tThis"><span class="label">Name of this type</span><input id="tThis" maxlength="40" autocomplete="off"></label>
-          <div class="f"><span class="label">&nbsp;</span><div class="actions"><button type="button" id="tRename">Rename</button><button type="button" class="danger" id="tRemove">Remove this type</button></div></div>
+          <label class="f" for="tDesc"><span class="label">Description on the home page (optional)</span><input id="tDesc" maxlength="300" autocomplete="off" placeholder="For example: Cream cotton, red print. Order by 12 October."></label>
+        </div>
+        <label class="chk" for="tAvail"><input type="checkbox" id="tAvail"> <span>Show this type on the home page as available to order</span></label>
+        <div class="actions"><button type="button" id="tRename">Save name, description and visibility</button><button type="button" class="danger" id="tRemove">Remove this type</button></div>
+        <div class="row">
+          <label class="f" for="tImg"><span class="label">Picture for the home page</span><input type="file" id="tImg" accept="image/*"></label>
+          <div class="f"><span class="label">&nbsp;</span><div class="actions"><button type="button" id="tImgSave">Upload picture</button><button type="button" class="danger" id="tImgRemove" hidden>Remove picture</button></div></div>
         </div>
         <div class="row">
           <label class="f" for="tName"><span class="label">Add another type</span><input id="tName" maxlength="40" autocomplete="off" placeholder="For example: Kurta, Saree, Cap"></label>
@@ -140,6 +148,7 @@
       <button class="small" id="copyUpi" type="button">Copy UPI ID</button>
     </div>
   </section>
+  </div>
   <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
 </div>
 <script src="/assets/common.js"></script>

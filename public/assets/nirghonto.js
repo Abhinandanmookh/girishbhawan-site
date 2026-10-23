@@ -68,6 +68,7 @@
   render();
   GB.ready.then(function (site) {
     var ev = site && site.events.filter(function (x) { return x.id === E; })[0];
+    GB.eventTabs(E, "nirghonto");
     if (ev) { $("evTitle").textContent = ev.title + " Nirghonto"; document.title = ev.title + " Nirghonto · Girish Bhawan"; $("wallLink").href = "/event/" + Q; }
     GB.api("schedule" + Q).then(function (j) { data = j; loaded = true; render(); fill(); },
       function (e) { loaded = true; blocked = e.status === 401 || e.status === 403 || e.status === 404; render(); if (!blocked) flash($("pageMsg"), "Could not load the schedule. Reload the page to try again.", true); });

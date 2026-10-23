@@ -2,6 +2,10 @@
   var $ = GB.$, el = GB.el, flash = GB.flash, E = GB.qs("e") || "durga-puja-2026", Q = "?e=" + encodeURIComponent(E);
   var admin = false, posts = [], loaded = false, busy = false, mayPost = true, needsApproval = true, blocked = false;
 
+  function platform(u) {
+    var h = host(u);
+    return /instagram\.com$/.test(h) ? "Instagram" : /(facebook\.com|fb\.watch)$/.test(h) ? "Facebook" : /(youtube\.com|youtu\.be)$/.test(h) ? "YouTube" : h;
+  }
   function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return "link"; } }
   function render() {
     var feed = $("feed"); feed.textContent = "";
@@ -14,14 +18,23 @@
     if (!posts.length) { feed.appendChild(el("p", "empty", "Nothing has been shared yet. Be the first to post a photo or a link.")); return; }
     posts.forEach(function (p) {
       var card = el("article", "post" + (p.status === "pending" ? " pending" : ""));
-      if (p.photo) { var im = el("img"); im.src = "/api/photo/" + p.id + Q; im.alt = "Photo shared by " + p.name; im.loading = "lazy"; card.appendChild(im); }
+      var plat = p.link ? platform(p.link) : "";
+      if (p.photo || p.link) {
+        var pic = el(p.link ? "a" : "div", "post-pic");
+        if (p.link) { pic.href = p.link; pic.target = "_blank"; pic.rel = "noopener nofollow ugc"; pic.setAttribute("aria-label", "Open on " + plat); }
+        if (p.photo) { var im = el("img"); im.src = "/api/photo/" + p.id + Q; im.alt = p.link ? "Preview of the " + plat + " post shared by " + p.name : "Photo shared by " + p.name; im.loading = "lazy"; pic.appendChild(im); }
+        else { var ph = el("div", "post-ph"); ph.appendChild(el("b", null, plat)); ph.appendChild(el("span", null, "Tap to open")); pic.appendChild(ph); }
+        if (p.link) pic.appendChild(el("span", "post-badge", plat));
+        card.appendChild(pic);
+      }
       var body = el("div", "post-body");
       if (p.status === "pending") body.appendChild(el("span", "pill part", "Waiting for approval"));
       if (p.comment) body.appendChild(el("p", "post-text", p.comment));
-      if (p.link) { var a = el("a", "post-link", "Open on " + host(p.link)); a.href = p.link; a.target = "_blank"; a.rel = "noopener nofollow ugc"; body.appendChild(a); }
+      if (p.link) { var a = el("a", "post-link", "Open on " + plat); a.href = p.link; a.target = "_blank"; a.rel = "noopener nofollow ugc"; body.appendChild(a); }
       body.appendChild(el("p", "post-meta", p.name + " · " + GB.when(p.ts)));
       if (admin) {
         var act = el("div", "actions");
+        if (p.link && !p.photo) { var pv = el("button", "small", "Fetch preview"); pv.type = "button"; pv.addEventListener("click", function () { moderate(p.id, "preview"); }); act.appendChild(pv); }
         if (p.status === "pending") { var ok = el("button", "small primary", "Approve"); ok.type = "button"; ok.addEventListener("click", function () { moderate(p.id, "approve"); }); act.appendChild(ok); }
         var del = el("button", "small danger", "Delete"); del.type = "button"; var armed = false;
         del.addEventListener("click", function () { if (!armed) { armed = true; del.textContent = "Confirm delete"; return; } moderate(p.id, "delete"); });
@@ -37,7 +50,7 @@
   function moderate(id, action) {
     GB.api("posts/moderate" + Q, { id: id, action: action }).then(load, function (e) {
       if (e.status === 401) GB.setAdmin(false);
-      flash($("feedMsg"), e.status === 401 ? "Your admin session has ended. Log in again." : "That did not work. Try again.", true);
+      flash($("feedMsg"), e.status === 401 ? "Your admin session has ended. Log in again." : e.code === "no preview" ? "That site did not share a preview picture. Ask the person to add a screenshot as the photo instead." : "That did not work. Try again.", true);
     });
   }
   function shrink(file) { return GB.shrink(file, [[1600, 0.82], [1280, 0.75], [1024, 0.7]], 1900000); }
@@ -70,6 +83,7 @@
   render();
   GB.ready.then(function (site) {
     var ev = site && site.events.filter(function (x) { return x.id === E; })[0];
+    GB.eventTabs(E, "wall");
     if (ev) { $("evTitle").textContent = ev.title; document.title = ev.title + " · Girish Bhawan"; $("evSub").textContent = ev.sub || ""; $("schedLink").hidden = !ev.schedule; $("schedLink").href = "/nirghonto/" + Q; }
     admin = !!(site && site.me.admin);
     load();

@@ -24,8 +24,11 @@ const DEFAULT_SITE = {
 const DEFAULT_ITEMS = [{ id: "tshirt", name: "T-shirt" }, { id: "kurti", name: "Kurti" }];
 function cleanItems(v) {
   const out = [], taken = new Set();
-  for (const it of Array.isArray(v) ? v.slice(0, 12) : []) { const name = txt(it?.name, 40); if (name) out.push({ id: uniqueId(it?.id, name, taken, "item"), name }); }
-  return out.length ? out : DEFAULT_ITEMS.map((x) => ({ ...x }));
+  for (const it of Array.isArray(v) ? v.slice(0, 12) : []) {
+    const name = txt(it?.name, 40);
+    if (name) out.push({ id: uniqueId(it?.id, name, taken, "item"), name, desc: multiline(it?.desc, 300), available: it?.available !== false, image: Number(it?.image) || 0 });
+  }
+  return out.length ? out : DEFAULT_ITEMS.map((x) => ({ ...x, desc: "", available: true, image: 0 }));
 }
 const FILE_TYPES = {
   pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", csv: "text/csv", txt: "text/plain",
@@ -117,7 +120,42 @@ function csv(rows) {
   const cell = (v) => { let s = String(v ?? ""); if (/^[=+\-@]/.test(s) && typeof v !== "number") s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   return "﻿" + rows.map((r) => r.map(cell).join(",")).join("\r\n");
 }
-const isBinaryKey = (k) => /^(photo\/|pending-photo\/|file\/)/.test(k) || k === "schedule-image" || /^wall\/[^/]+\/(photo|pending)\//.test(k) || /^sched\/[^/]+\/image$/.test(k);
+const isBinaryKey = (k) => /^(photo\/|pending-photo\/|file\/|item-img\/)/.test(k) || /^album\/[^/]+\/(orig|prev|thumb)\//.test(k) || k === "schedule-image" || /^wall\/[^/]+\/(photo|pending)\//.test(k) || /^sched\/[^/]+\/image$/.test(k);
+function imgType(buf) {
+  const b = new Uint8Array(buf, 0, Math.min(12, buf.byteLength));
+  if (b[0] === 0xff && b[1] === 0xd8) return "image/jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50) return "image/png";
+  if (b[0] === 0x47 && b[1] === 0x49) return "image/gif";
+  if (b[0] === 0x52 && b[1] === 0x49 && b[8] === 0x57 && b[9] === 0x45) return "image/webp";
+  return null;
+}
+const SOCIAL_HOSTS = /(^|\.)(instagram\.com|facebook\.com|fb\.watch|youtube\.com|youtu\.be)$/i;
+const IMAGE_HOSTS = /(^|\.)(cdninstagram\.com|fbcdn\.net|ytimg\.com|ggpht\.com|googleusercontent\.com)$/i;
+const youtubeId = (link) => { try { const u = new URL(link); if (/youtu\.be$/i.test(u.hostname)) return u.pathname.slice(1, 12); if (/youtube\.com$/i.test(u.hostname)) return u.searchParams.get("v") || (/\/(shorts|embed|live)\/([\w-]{11})/.exec(u.pathname) || [])[2] || ""; } catch {} return ""; };
+async function fetchImage(href) {
+  try {
+    const u = new URL(href);
+    if (u.protocol !== "https:" || !IMAGE_HOSTS.test(u.hostname)) return null;
+    const r = await fetch(u.href, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const buf = await r.arrayBuffer();
+    return buf.byteLength > 500 && buf.byteLength < 2500000 && imgType(buf) ? buf : null;
+  } catch { return null; }
+}
+// Picture shown on a post that links to Instagram, Facebook or YouTube. Returns null when the site will not share one.
+async function fetchPreview(link) {
+  try {
+    const u = new URL(link);
+    if (u.protocol !== "https:" || !SOCIAL_HOSTS.test(u.hostname)) return null;
+    const yt = youtubeId(link);
+    if (yt && /^[\w-]{11}$/.test(yt)) return await fetchImage(`https://i.ytimg.com/vi/${yt}/hqdefault.jpg`);
+    const r = await fetch(u.href, { headers: { "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", accept: "text/html" }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const html = (await r.text()).slice(0, 800000);
+    const m = /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]*content=["']([^"']+)["']/i.exec(html) || /<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:image["']/i.exec(html);
+    return m ? await fetchImage(m[1].replace(/&amp;/g, "&")) : null;
+  } catch { return null; }
+}
 const isTransientKey = (k) => /^(rate|fails)\//.test(k);
 const validKey = (k) => typeof k === "string" && k.length < 200 && /^[A-Za-z0-9._\/-]+$/.test(k) && !k.includes("..");
 
@@ -245,6 +283,22 @@ export function createApp(getStore, env) {
         return json(200, { ok: true }, { "set-cookie": session(u.id, u.pv) });
       }
 
+      /* ---------- what is on offer: public list of dress types marked available ---------- */
+      if (route === "catalog" && GET) {
+        const items = cleanItems((await s.get("order-items", { type: "json" })) || DEFAULT_ITEMS), out = [];
+        for (const it of items.filter((x) => x.available)) {
+          const d = cleanOrders((await s.get(it.id === "tshirt" ? "orders" : "orders/" + it.id, { type: "json" })) || (it.id === "tshirt" ? DEFAULT_ORDERS : { price: it.id === "kurti" ? 525 : 0 }));
+          out.push({ id: it.id, name: it.name, desc: it.desc, price: d.price, sizes: d.sizes, sizePrices: d.sizePrices,
+            image: it.image ? `/api/item-image?i=${it.id}&v=${it.image}` : it.id === "tshirt" ? "/assets/design.jpg" : "" });
+        }
+        return json(200, { items: out });
+      }
+      if (route === "item-image" && GET) {
+        const img = await s.get("item-img/" + (url.searchParams.get("i") || "").replace(/[^a-z0-9-]/g, ""), { type: "arrayBuffer" });
+        if (!img) return new Response("Not found", { status: 404 });
+        return new Response(img, { status: 200, headers: { "content-type": "image/jpeg", "x-content-type-options": "nosniff", "cache-control": "public, max-age=86400" } });
+      }
+
       /* ---------- dress orders: one tracker per dress type (T-shirt, Kurti, ...) ---------- */
       if (route === "orders" || route === "report") {
         const items = cleanItems((await s.get("order-items", { type: "json" })) || DEFAULT_ITEMS);
@@ -262,6 +316,7 @@ export function createApp(getStore, env) {
         const id = url.searchParams.get("i") || items[0].id, item = items.find((x) => x.id === id);
 
         if (route === "orders" && GET) {
+          if (!admin && !active(who)) return deny();
           if (!item) return json(404, { error: "no such item" });
           return json(200, { ...(await getOrders(id)), items, item });
         }
@@ -282,6 +337,19 @@ export function createApp(getStore, env) {
             }
             const target = items.find((x) => x.id === b.id);
             if (!target) return json(404, { error: "no such item" });
+            if (b.action === "update") {
+              const name = txt(b.name, 40);
+              if (!name) return json(400, { error: "name" });
+              target.name = name; target.desc = multiline(b.desc, 300); target.available = b.available !== false;
+              await s.setJSON("order-items", items);
+              return json(200, { ok: true });
+            }
+            if (b.action === "image") {
+              if (b.remove) { await s.delete("item-img/" + target.id); target.image = 0; }
+              else { const img = jpeg(b.photo, 1500000); if (!img) return json(400, { error: "photo" }); await s.set("item-img/" + target.id, img); target.image = Date.now(); }
+              await s.setJSON("order-items", items);
+              return json(200, { ok: true });
+            }
             if (b.action === "rename") {
               const name = txt(b.name, 40);
               if (!name) return json(400, { error: "name" });
@@ -344,7 +412,7 @@ export function createApp(getStore, env) {
       }
 
       /* ---------- events: photo wall and Nirghonto ---------- */
-      if (["posts", "photo", "schedule", "schedule-image"].includes(route)) {
+      if (["posts", "photo", "schedule", "schedule-image", "album"].includes(route)) {
         const site = await getSite(), e = url.searchParams.get("e") || LEGACY, ev = site.events.find((x) => x.id === e);
         if (!ev) return json(404, { error: "no such event" });
         if (!canSee(ev, who)) return route === "photo" || route === "schedule-image" ? new Response("Not found", { status: 404 }) : deny();
@@ -396,8 +464,10 @@ export function createApp(getStore, env) {
           if (!admin && (await overLimit("rate/" + ipKey(req, ctx), 6, 3600000, true))) return json(429, { error: "too many posts" });
           const status = admin || ev.autoApprove ? "approved" : "pending";
           const id = crypto.randomBytes(8).toString("hex"), ts = Date.now();
+          let preview = false;
+          if (!photo && link) { photo = await fetchPreview(link); preview = !!photo; }
           if (photo) await s.set(photoKey(e, id, status !== "approved"), photo);
-          await s.setJSON(`${postPrefix(e)}${inv(ts)}-${id}`, { id, name, comment, link, photo: !!photo, ts, status, by: who.user ? who.user.id : "" });
+          await s.setJSON(`${postPrefix(e)}${inv(ts)}-${id}`, { id, name, comment, link, photo: !!photo, preview, ts, status, by: who.user ? who.user.id : "" });
           return json(200, { ok: true, status });
         }
         if (route === "posts" && POST && seg[1] === "moderate") {
@@ -410,6 +480,11 @@ export function createApp(getStore, env) {
           if (!k) return json(404, { error: "not found" });
           const p = await s.get(k, { type: "json" });
           if (b.action === "delete") { await s.delete(k); await s.delete(photoKey(e, id, false)); await s.delete(photoKey(e, id, true)); }
+          else if (b.action === "preview" && p && p.link && !p.photo) {
+            const img = await fetchPreview(p.link);
+            if (!img) return json(422, { error: "no preview" });
+            await s.set(photoKey(e, id, p.status !== "approved"), img); await s.setJSON(k, { ...p, photo: true, preview: true });
+          }
           else if (b.action === "approve" && p && p.status !== "approved") {
             if (p.photo) { const img = await s.get(photoKey(e, id, true), { type: "arrayBuffer" }); if (img) { await s.set(photoKey(e, id, false), img); await s.delete(photoKey(e, id, true)); } }
             await s.setJSON(k, { ...p, status: "approved" });
@@ -420,7 +495,71 @@ export function createApp(getStore, env) {
           let img = await s.get(photoKey(e, seg[1], false), { type: "arrayBuffer" }), pub = ev.access === "public";
           if (!img && admin) { img = await s.get(photoKey(e, seg[1], true), { type: "arrayBuffer" }); pub = false; }
           if (!img) return new Response("Not found", { status: 404 });
-          return new Response(img, { status: 200, headers: { "content-type": "image/jpeg", "x-content-type-options": "nosniff", "cache-control": pub ? "public, max-age=3600" : "private, no-store" } });
+          return new Response(img, { status: 200, headers: { "content-type": imgType(img) || "image/jpeg", "x-content-type-options": "nosniff", "cache-control": pub ? "public, max-age=3600" : "private, no-store" } });
+        }
+
+        /* ---------- album: photos and videos with download by permission ---------- */
+        if (route === "album") {
+          const metaPrefix = `album/${e}/meta/`, grantKey = (uid) => `grant/${e}/${uid}`, reqKey = (uid) => `dlreq/${e}/${uid}`;
+          const uid = active(who) ? who.user.id : "";
+          const canDownload = admin || (!!uid && !!(await s.get(grantKey(uid), { type: "json" })));
+          const findMeta = async (id) => (await keys(metaPrefix)).find((x) => x.endsWith("-" + id));
+          const act = seg[1] || "";
+          if (!act && GET) {
+            const items = (await Promise.all((await keys(metaPrefix)).slice(0, 1000).map((k) => s.get(k, { type: "json" })))).filter(Boolean);
+            return json(200, { items, mayUpload: admin || !!uid, canDownload, requested: !!uid && !canDownload && !!(await s.get(reqKey(uid), { type: "json" })), me: uid });
+          }
+          if (["thumb", "prev", "orig"].includes(act) && GET) {
+            const id = seg[2] || "";
+            if (!/^[0-9a-f]{16}$/.test(id)) return new Response("Not found", { status: 404 });
+            if (act === "orig" && !canDownload) return new Response("Ask the admin for download access first.", { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } });
+            const img = await s.get(`album/${e}/${act}/${id}`, { type: "arrayBuffer" });
+            if (!img) return new Response("Not found", { status: 404 });
+            const h = { "content-type": imgType(img) || "image/jpeg", "x-content-type-options": "nosniff", "cache-control": act === "orig" || ev.access !== "public" ? "private, no-store" : "public, max-age=86400" };
+            if (act === "orig") h["content-disposition"] = `attachment; filename="girish-bhawan-${e}-${id}.jpg"`;
+            return new Response(img, { status: 200, headers: h });
+          }
+          if (!POST) return json(404, { error: "not found" });
+          const b = await body(req);
+          if (!b) return json(400, { error: "bad request" });
+          if (!admin && !uid) return deny();
+          if (!act) {
+            const kind = b.kind === "video" ? "video" : "photo", caption = multiline(b.caption, 300);
+            let link = "";
+            if (kind === "video") { link = httpsUrl(b.link); if (!link) return json(400, { error: "link" }); }
+            let thumb = b.thumb ? jpeg(b.thumb, 300000) : null, prev = b.prev ? jpeg(b.prev, 900000) : null;
+            if ((b.thumb && !thumb) || (b.prev && !prev)) return json(400, { error: "photo" });
+            if (kind === "photo" && (!thumb || !prev)) return json(400, { error: "photo" });
+            if (kind === "video" && !thumb) { const yt = youtubeId(link); if (yt) { thumb = await fetchImage(`https://i.ytimg.com/vi/${yt}/hqdefault.jpg`); prev = thumb; } }
+            if (!admin && (await overLimit("rate/album-" + uid, 200, 3600000, true))) return json(429, { error: "too many" });
+            const id = crypto.randomBytes(8).toString("hex"), ts = Date.now();
+            if (thumb) await s.set(`album/${e}/thumb/${id}`, thumb);
+            if (prev) await s.set(`album/${e}/prev/${id}`, prev);
+            await s.setJSON(`${metaPrefix}${inv(ts)}-${id}`, { id, kind, link, caption, thumb: !!thumb, orig: false, ts, by: uid, byName: admin ? "Admin" : who.user.name });
+            return json(200, { ok: true, id });
+          }
+          if (act === "orig") {
+            const k = await findMeta(String(b.id || "")), m = k ? await s.get(k, { type: "json" }) : null;
+            if (!m || m.kind !== "photo" || (!admin && m.by !== uid)) return json(404, { error: "not found" });
+            const img = jpeg(b.orig, 4000000);
+            if (!img) return json(400, { error: "photo" });
+            await s.set(`album/${e}/orig/${m.id}`, img); await s.setJSON(k, { ...m, orig: true });
+            return json(200, { ok: true });
+          }
+          if (act === "delete") {
+            const k = await findMeta(String(b.id || "")), m = k ? await s.get(k, { type: "json" }) : null;
+            if (!m) return json(404, { error: "not found" });
+            if (!admin && m.by !== uid) return deny();
+            for (const part of ["thumb", "prev", "orig"]) await s.delete(`album/${e}/${part}/${m.id}`);
+            await s.delete(k);
+            return json(200, { ok: true });
+          }
+          if (act === "request") {
+            if (!uid) return deny();
+            if (!canDownload) await s.setJSON(reqKey(uid), { e, uid, ts: Date.now() });
+            return json(200, { ok: true });
+          }
+          return json(404, { error: "not found" });
         }
       }
 
@@ -472,7 +611,8 @@ export function createApp(getStore, env) {
         const act = seg[1] || "";
         if (act === "state" && GET) {
           const users = (await Promise.all((await keys("user/")).map((k) => s.get(k, { type: "json" })))).filter(Boolean).sort((a, b) => b.created - a.created);
-          return json(200, { site: await getSite(), users: users.map(publicUser) });
+          const requests = (await Promise.all((await keys("dlreq/")).map((k) => s.get(k, { type: "json" })))).filter(Boolean).sort((a, b) => a.ts - b.ts);
+          return json(200, { site: await getSite(), users: users.map(publicUser), requests });
         }
         if (act === "blob" && GET) {
           const k = url.searchParams.get("key");
@@ -489,6 +629,14 @@ export function createApp(getStore, env) {
         const b = await body(req);
         if (!b) return json(400, { error: "bad request" });
         if (act === "site") { const d = cleanSite(b); await s.setJSON("site", d); return json(200, { ok: true, site: d }); }
+        if (act === "request") {
+          const e = String(b.e || ""), uid = String(b.uid || "");
+          if (!/^[a-z0-9-]{1,40}$/.test(e) || !/^[0-9a-f]{16}$/.test(uid)) return json(400, { error: "bad request" });
+          if (b.action === "approve") await s.setJSON(`grant/${e}/${uid}`, { ts: Date.now() });
+          if (b.action === "revoke") await s.delete(`grant/${e}/${uid}`);
+          await s.delete(`dlreq/${e}/${uid}`);
+          return json(200, { ok: true });
+        }
         if (act === "user") {
           const id = String(b.id || "");
           if (!/^[0-9a-f]{16}$/.test(id)) return json(400, { error: "id" });
