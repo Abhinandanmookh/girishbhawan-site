@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Girish Bhawan</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a></nav>
+  </div>
+  <header>
+    <div>
+      <p class="eyebrow" id="secAccess"></p>
+      <h1 id="secTitle">Documents</h1>
+      <p class="sub" id="secSub"></p>
+    </div>
+  </header>
+
+  <section id="upSec" hidden>
+    <h2>Add a document</h2>
+    <form id="upForm" novalidate>
+      <label class="f" for="upFile"><span class="label">File (PDF, Excel, Word, PowerPoint, CSV, text or picture, up to 4 MB)</span><input type="file" id="upFile" accept=".pdf,.jpg,.jpeg,.png,.webp,.csv,.txt,.xlsx,.xls,.docx,.doc,.pptx"></label>
+      <label class="f" for="upNote"><span class="label">Note (optional)</span><input id="upNote" maxlength="200" autocomplete="off" placeholder="For example: Pujo accounts 2026, final"></label>
+      <div class="actions"><button class="primary" type="submit">Upload</button></div>
+      <div class="msg" id="upMsg" role="status"></div>
+    </form>
+  </section>
+
+  <section>
+    <h2>Documents</h2>
+    <div class="msg" id="pageMsg" role="status"></div>
+    <div class="filebox" id="files"><p class="empty">Loading…</p></div>
+  </section>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/section.js"></script>
+</body>
+</html>
