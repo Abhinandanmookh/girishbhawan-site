@@ -1,5 +1,5 @@
 (function () {
-  var $ = GB.$, el = GB.el, flash = GB.flash, site = null, users = [], requests = [];
+  var $ = GB.$, el = GB.el, flash = GB.flash, site = null, users = [], preqs = [], flagged = [];
   var ACCESS = [["admin", "Admin only"], ["groups", "Selected groups"], ["members", "All approved members"], ["public", "Everyone, no login"]];
 
   function input(value, onchange, attrs) { var i = el("input"); i.value = value || ""; for (var k in attrs || {}) i.setAttribute(k, attrs[k]); i.addEventListener("input", function () { onchange(i.value); }); return i; }
@@ -52,25 +52,72 @@
     });
   }
 
-  /* ---------- album download requests ---------- */
+  /* ---------- Google: Drive and YouTube connection ---------- */
+  function renderGoogle(gs) {
+    var box = $("gBox"); box.textContent = "";
+    if (!gs.configured) {
+      box.appendChild(el("p", null, "Not set up yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Netlify (see the setup guide), redeploy, then come back here."));
+      return;
+    }
+    if (gs.connected) {
+      box.appendChild(el("p", null, "Connected to " + (gs.email || "your Google account") + ". Photos come from the Drive folders and videos from the YouTube playlists of each event."));
+      var row = el("div", "actions");
+      var re = el("a", "btnlink", "Connect again"); re.href = "/api/google/connect"; row.appendChild(re);
+      row.appendChild(confirmBtn("Disconnect", function () { GB.api("google/disconnect", {}).then(load); }));
+      box.appendChild(row);
+    } else {
+      box.appendChild(el("p", null, "Not connected. Sign in with the Google account that owns the Girish Bhawan Drive folder and the YouTube channel (abhi@wenpower.in)."));
+      var c = el("a", "btnlink primary", "Connect Google Drive and YouTube"); c.href = "/api/google/connect"; box.appendChild(c);
+    }
+  }
+
+  /* ---------- photo and video requests, flagged items, stories waiting ---------- */
+  function evTitle(id) { var ev = site.events.filter(function (x) { return x.id === id; })[0]; return ev ? ev.title : id; }
   function renderRequests() {
     var box = $("requests"); box.textContent = "";
-    if (!requests.length) { box.appendChild(el("p", "empty", "No requests waiting.")); return; }
-    requests.forEach(function (r) {
-      var u = users.filter(function (x) { return x.id === r.uid; })[0], ev = site.events.filter(function (x) { return x.id === r.e; })[0];
+    var open = preqs.filter(function (r) { return r.status !== "shared"; }), done = preqs.filter(function (r) { return r.status === "shared"; });
+    $("rqCount").textContent = open.length ? open.length + " waiting" : "";
+    if (!preqs.length) { box.appendChild(el("p", "empty", "No requests yet. When someone asks for a photo or video, it appears here with their name and email.")); return; }
+    open.concat(done.slice(0, 20)).forEach(function (r) {
       var card = el("div", "admin"), head = el("div", "head"), t = el("div");
-      t.appendChild(el("strong", null, (u ? u.name : "A member") + " wants to download the " + (ev ? ev.title : r.e) + " album"));
-      t.appendChild(el("span", "note", "Asked " + GB.when(r.ts)));
-      head.appendChild(t); card.appendChild(head);
+      t.appendChild(el("strong", null, r.name + " (" + r.kind + ") asks for " + (r.code || "an item")));
+      t.appendChild(el("span", "note", (r.email ? r.email + " · " : "") + evTitle(r.e) + " · " + GB.when(r.ts)));
+      if (r.note) t.appendChild(el("span", "note", "Message: " + r.note));
+      head.appendChild(t);
+      head.appendChild(el("span", "pill " + (r.status === "shared" ? "paid" : "part"), r.status === "shared" ? "Shared" : "Waiting"));
+      card.appendChild(head);
       var act = el("div", "actions");
-      act.appendChild(button("Approve", "small primary", function () { reqAction(r, "approve"); }));
-      act.appendChild(button("Decline", "small", function () { reqAction(r, "decline"); }));
+      if (r.item.indexOf("d-") === 0) { var d = el("a", "btnlink small", "Open in Drive"); d.href = "https://drive.google.com/file/d/" + r.item.slice(2) + "/view"; d.target = "_blank"; d.rel = "noopener"; act.appendChild(d); }
+      if (r.item.indexOf("y-") === 0) { var y = el("a", "btnlink small", "Open on YouTube"); y.href = "https://www.youtube.com/watch?v=" + r.item.slice(2); y.target = "_blank"; y.rel = "noopener"; act.appendChild(y); }
+      if (r.status !== "shared") act.appendChild(button("Mark as shared", "small primary", function () { preqAction(r, "done"); }));
+      act.appendChild(confirmBtn("Delete", function () { preqAction(r, "delete"); }));
       card.appendChild(act); box.appendChild(card);
     });
   }
-  function reqAction(r, action) {
-    GB.api("admin/request", { e: r.e, uid: r.uid, action: action }).then(function () { flash($("rqMsg"), action === "approve" ? "Access given." : "Request declined."); load(); },
+  function preqAction(r, action) {
+    GB.api("admin/preq", { id: r.id, action: action }).then(function () { flash($("rqMsg"), action === "done" ? "Marked as shared." : "Request deleted."); load(); },
       function () { flash($("rqMsg"), "That did not work. Try again.", true); });
+  }
+  function renderFlagged() {
+    var box = $("flagged"); box.textContent = "";
+    $("flagSec").hidden = !flagged.length;
+    flagged.forEach(function (f) {
+      var card = el("div", "admin flagrow"), id = f.item.slice(2);
+      var im = el("img"); im.alt = ""; im.src = f.item[0] === "d" ? "/api/album/dthumb/" + id + "?e=" + f.e + "&s=400" : f.item[0] === "y" ? "https://i.ytimg.com/vi/" + id + "/mqdefault.jpg" : "/api/album/thumb/" + id + "?e=" + f.e;
+      card.appendChild(im);
+      var t = el("div", "stack");
+      t.appendChild(el("strong", null, f.event + ": " + f.down + " thumbs down, " + f.up + " thumbs up" + (f.hidden ? " (hidden)" : "")));
+      var act = el("div", "actions");
+      if (!f.hidden) act.appendChild(button("Hide from the album", "small primary", function () { flagAction(f, "hide"); }));
+      act.appendChild(button("Keep it", "small", function () { flagAction(f, "keep"); }));
+      var a = el("a", "btnlink small", "Open album"); a.href = "/album/?e=" + f.e; act.appendChild(a);
+      t.appendChild(act); card.appendChild(t); box.appendChild(card);
+    });
+  }
+  function flagAction(f, action) {
+    GB.api("album/moderate?e=" + encodeURIComponent(f.e), { item: f.item, action: action === "keep" ? "keep" : "hide" })
+      .then(function () { return action === "hide" ? GB.api("album/moderate?e=" + encodeURIComponent(f.e), { item: f.item, action: "keep" }) : null; })
+      .then(load, function () { flash($("flagMsg"), "That did not work. Try again.", true); });
   }
 
   /* ---------- settings: groups, sections, events, links ---------- */
@@ -90,7 +137,7 @@
     checks.hidden = it.access !== "groups"; card.appendChild(checks);
   }
   function renderSite() {
-    $("lFb").value = site.links.facebook || ""; $("lIg").value = site.links.instagram || "";
+    $("lFb").value = site.links.facebook || ""; $("lIg").value = site.links.instagram || ""; $("lYt").value = site.links.youtube || "";
     listEditor("groups", site.groups, function (card, g) {
       card.appendChild(field("Group name", input(g.name, function (v) { g.name = v; }, { maxlength: 60 })));
     }, function () { return { id: "", name: "" }; }, "Add a group");
@@ -103,18 +150,30 @@
     }, function () { return { id: "", title: "", desc: "", access: "admin", groups: [], memberUpload: false }; }, "Add a section");
     listEditor("events", site.events, function (card, e) {
       var row = el("div", "row");
-      row.appendChild(field("Event title", input(e.title, function (v) { e.title = v; }, { maxlength: 60 })));
-      row.appendChild(field("Line under the title", input(e.sub, function (v) { e.sub = v; }, { maxlength: 200 })));
-      card.appendChild(row); accessRow(card, e, ["public", "members", "groups", "admin"]);
+      row.appendChild(field("Occasion", input(e.occasion, function (v) { e.occasion = v; }, { maxlength: 50, placeholder: "Durga Puja" })));
+      row.appendChild(field("Year", input(e.year, function (v) { e.year = v; }, { type: "number", min: 1900, max: 2100, inputmode: "numeric" }), "sz"));
+      card.appendChild(row);
+      card.appendChild(field("Line under the title", input(e.sub, function (v) { e.sub = v; }, { maxlength: 200 })));
+      card.appendChild(field("YouTube playlist link (Unlisted playlist on the Girish Bhawan channel)", input(e.playlist ? "https://www.youtube.com/playlist?list=" + e.playlist : "", function (v) { e.playlist = v; }, { inputmode: "url", placeholder: "https://www.youtube.com/playlist?list=..." })));
+      var dr = el("p", "hint");
+      if (e.driveImages) {
+        dr.appendChild(document.createTextNode("Google Drive: "));
+        [["Images folder", e.driveImages], ["Videos folder", e.driveVideos]].forEach(function (x, i) {
+          if (!x[1]) return; if (i) dr.appendChild(document.createTextNode(" · "));
+          var a = el("a", null, x[0]); a.href = "https://drive.google.com/drive/folders/" + x[1]; a.target = "_blank"; a.rel = "noopener"; dr.appendChild(a);
+        });
+      } else dr.textContent = "Google Drive folders are created when you save, once Google is connected.";
+      card.appendChild(dr);
+      accessRow(card, e, ["public", "members", "groups", "admin"]);
       card.appendChild(field("Who can post photos and links", select([["anyone", "Anyone who can open the page"], ["members", "Approved members only"]], e.post, function (v) { e.post = v; })));
       card.appendChild(check("Show new posts straight away, without my approval", e.autoApprove, function (on) { e.autoApprove = on; }));
       card.appendChild(check("This event has a Nirghonto (schedule) page", e.schedule, function (on) { e.schedule = on; }));
-    }, function () { return { id: "", title: "", sub: "", schedule: true, access: "public", groups: [], post: "anyone", autoApprove: false }; }, "Add an event");
+    }, function () { return { id: "", occasion: "", year: new Date().getFullYear(), sub: "", schedule: true, access: "public", groups: [], post: "anyone", autoApprove: false, playlist: "" }; }, "Add an event");
   }
   $("siteSave").addEventListener("click", function () {
-    site.links = { facebook: $("lFb").value.trim(), instagram: $("lIg").value.trim() };
+    site.links = { facebook: $("lFb").value.trim(), instagram: $("lIg").value.trim(), youtube: $("lYt").value.trim() };
     flash($("siteMsg"), "Saving…");
-    GB.api("admin/site", site).then(function (j) { site = j.site; renderSite(); renderUsers(); flash($("siteMsg"), "Settings saved."); },
+    GB.api("admin/site", site).then(function (j) { site = j.site; renderSite(); renderUsers(); flash($("siteMsg"), j.problems && j.problems.length ? "Saved, but some Drive folders could not be created: " + j.problems.join("; ") : "Settings saved.", !!(j.problems && j.problems.length)); },
       function (e) { flash($("siteMsg"), e.status === 401 ? "Your admin session has ended. Log in again." : "Could not save. Try again.", true); });
   });
 
@@ -188,8 +247,11 @@
   });
 
   function load() {
-    return GB.api("admin/state").then(function (j) { site = j.site; users = j.users; requests = j.requests || []; renderRequests(); $("adminBody").hidden = false; $("adminGate").hidden = true; renderUsers(); renderSite(); },
+    return GB.api("admin/state").then(function (j) { site = j.site; users = j.users; preqs = j.preqs || []; flagged = j.flagged || []; renderRequests(); renderFlagged(); renderGoogle(j.google);
+      $("storyNote").hidden = !j.pendingStories; $("storyNote").firstChild.textContent = j.pendingStories + " stor" + (j.pendingStories === 1 ? "y is" : "ies are") + " waiting for approval. "; $("adminBody").hidden = false; $("adminGate").hidden = true; renderUsers(); renderSite(); },
       function () { $("adminBody").hidden = true; $("adminGate").hidden = false; });
   }
+  var gq = GB.qs("google");
+  if (gq) flash($("gMsg"), gq === "connected" ? "Google is connected." : gq === "notset" ? "Google is not set up in Netlify yet." : gq === "norefresh" ? "Google did not give a lasting permission. Remove the site's access in your Google account settings, then connect again." : "Connecting to Google did not finish. Try again.", gq !== "connected");
   GB.ready.then(load);
 })();

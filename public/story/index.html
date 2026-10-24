@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Our story · Girish Bhawan</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="site-head">
+    <a class="logo" href="/"><img class="emblem" src="/assets/emblem.webp" alt="" width="480" height="480"><img class="word" src="/assets/logo.png" alt="গিরিশ ভবন (Girish Bhawan)" width="560" height="238"></a>
+    <nav aria-label="Site" id="siteNav"><a href="/">Home</a><a href="/event/?e=durga-puja-2026">Durga Puja 2026</a></nav>
+  </div>
+  <header>
+    <div>
+      <p class="eyebrow" lang="bn">আমাদের কথা</p>
+      <h1>Our story</h1>
+      <p class="sub">Moments from the life of Girish Bhawan and its family, in the order they happened. Anyone can add a memory; the admin approves it before it appears.</p>
+    </div>
+  </header>
+
+  <section>
+    <h2>Add a memory</h2>
+    <form id="storyForm" novalidate>
+      <div class="row">
+        <label class="f" for="sYear"><span class="label">Year (needed)</span><input id="sYear" type="number" inputmode="numeric" min="1700" max="2100" placeholder="1965"></label>
+        <label class="f" for="sMonth"><span class="label">Month (if you know it)</span><select id="sMonth"><option value="">Not sure</option></select></label>
+        <label class="f" for="sDay"><span class="label">Date (if you know it)</span><select id="sDay"><option value="">Not sure</option></select></label>
+      </div>
+      <label class="f" for="sTitle"><span class="label">What happened, in a few words</span><input id="sTitle" maxlength="120" autocomplete="off" placeholder="For example: First Durga Puja in the new thakur dalan"></label>
+      <label class="f" for="sText"><span class="label">Tell the story (optional)</span><textarea id="sText" rows="5" maxlength="3000"></textarea></label>
+      <div class="row">
+        <label class="f" for="sName"><span class="label">Your name</span><input id="sName" maxlength="60" autocomplete="name"></label>
+        <label class="f" for="sPhoto"><span class="label">A photo (optional, made smaller than 1 MB automatically)</span><input id="sPhoto" type="file" accept="image/*"></label>
+      </div>
+      <label class="trap" aria-hidden="true">Leave this empty<input id="sWebsite" tabindex="-1" autocomplete="off"></label>
+      <div class="actions"><button class="primary" type="submit">Send for approval</button></div>
+      <div class="msg" id="sMsg" role="status"></div>
+    </form>
+  </section>
+
+  <div class="msg" id="pageMsg" role="status"></div>
+  <section class="timeline" id="timeline"><p class="empty">Loading…</p></section>
+  <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
+</div>
+<script src="/assets/common.js"></script>
+<script src="/assets/story.js"></script>
+</body>
+</html>

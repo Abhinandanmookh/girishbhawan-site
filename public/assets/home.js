@@ -8,11 +8,17 @@ GB.ready.then(function (site) {
     if (subs && subs.length) { var row = el("div", "door-links"); subs.forEach(function (s) { var x = el("a", null, s[1]); x.href = s[0]; row.appendChild(x); }); card.appendChild(row); }
     box.appendChild(card);
   }
-  site.events.forEach(function (e) {
-    var q = "?e=" + e.id, subs = [["/album/" + q, "Photos and videos"]];
-    if (e.schedule) subs.push(["/nirghonto/" + q, "Nirghonto"]);
-    door("/event/" + q, e.title, e.sub || "Photos, links and greetings from the family.", subs);
+  var years = {};
+  site.events.forEach(function (e) { (years[e.year] = years[e.year] || []).push(e); });
+  Object.keys(years).sort(function (a, b) { return b - a; }).forEach(function (y) {
+    var h = el("h3", "year-head", y); box.appendChild(h);
+    years[y].forEach(function (e) {
+      var q = "?e=" + e.id, subs = [["/album/" + q, "Photos and videos"]];
+      if (e.schedule) subs.push(["/nirghonto/" + q, "Nirghonto"]);
+      door("/event/" + q, e.occasion || e.title, e.sub || "Photos, links and greetings from the family.", subs);
+    });
   });
+  door("/story/", "Our story", "The family's history and memories, year by year. Anyone can add to it.");
   if (member) door("/tshirt/", "Dress orders", "Who ordered which size, and who has paid.");
   site.sections.forEach(function (s) { door("/section/?s=" + s.id, s.title, s.desc || "Documents for the family."); });
   if (!site.me.admin && !site.me.user) door("/account/", "Family login", "Log in or register to see the family-only sections.");

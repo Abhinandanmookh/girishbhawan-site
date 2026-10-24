@@ -32,11 +32,24 @@
       <div class="stack" id="users"></div>
     </section>
 
-    <section id="reqSec">
-      <h2>Download requests</h2>
-      <p class="hint">Family members ask here to download the full-size photos of an event's album. Approving gives that person access to the whole album.</p>
+    <section>
+      <h2>Google Drive and YouTube</h2>
+      <div class="admin"><div id="gBox"></div><div class="msg" id="gMsg" role="status"></div></div>
+    </section>
+
+    <p class="notebox" id="storyNote" hidden><span></span><a href="/story/">Review them on Our story.</a></p>
+
+    <section>
+      <div class="head"><h2>Photo and video requests</h2><span class="label" id="rqCount"></span></div>
+      <p class="hint">People ask for a copy of a photo or video from the album. Share it with them from Drive (or send it on WhatsApp), then mark it as shared.</p>
       <div class="msg" id="rqMsg" role="status"></div>
       <div class="stack" id="requests"></div>
+    </section>
+
+    <section id="flagSec" hidden>
+      <h2>Photos and videos with 5 or more thumbs down</h2>
+      <div class="msg" id="flagMsg" role="status"></div>
+      <div class="stack" id="flagged"></div>
     </section>
 
     <section>
@@ -53,7 +66,7 @@
 
     <section>
       <h2>Events</h2>
-      <p class="hint">Each event gets a photo wall and, if you tick it, a Nirghonto page. Add next year's Pujo or any other occasion here.</p>
+      <p class="hint">Each event is an occasion in a year. It gets a family wall, a photo and video album (with its own Google Drive folders, created on save) and, if you tick it, a Nirghonto page.</p>
       <div class="stack" id="events"></div>
     </section>
 
@@ -63,6 +76,7 @@
         <div class="row">
           <label class="f" for="lFb"><span class="label">Facebook page</span><input id="lFb" inputmode="url" autocomplete="off"></label>
           <label class="f" for="lIg"><span class="label">Instagram page</span><input id="lIg" inputmode="url" autocomplete="off"></label>
+          <label class="f" for="lYt"><span class="label">YouTube channel</span><input id="lYt" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/@GirishBhawan"></label>
         </div>
       </div>
     </section>

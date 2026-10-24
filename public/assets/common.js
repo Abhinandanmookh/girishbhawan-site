@@ -27,7 +27,8 @@ window.GB = (function () {
     if (nav && site) {
       nav.textContent = "";
       var items = [["/", "Home"]];
-      site.events.forEach(function (e) { items.push(["/event/?e=" + e.id, e.title]); });
+      site.events.slice().sort(function (a, b) { return b.year - a.year; }).slice(0, 3).forEach(function (e) { items.push(["/event/?e=" + e.id, e.title]); });
+      items.push(["/story/", "Our story"]);
       if (me.admin || (me.user && me.user.status === "active")) items.push(["/tshirt/", "Dress orders"]);
       site.sections.forEach(function (s) { items.push(["/section/?s=" + s.id, s.title]); });
       items.forEach(function (it) { var a = link(it[0], it[1]); if (it[0] === here || (it[0] === "/" && location.pathname === "/")) a.setAttribute("aria-current", "page"); nav.appendChild(a); });
@@ -38,8 +39,16 @@ window.GB = (function () {
       var L = (site && site.links) || {};
       if (L.facebook) { sep(foot); foot.appendChild(ext(L.facebook, "Facebook")); }
       if (L.instagram) { sep(foot); foot.appendChild(ext(L.instagram, "Instagram")); }
+      if (L.youtube) { sep(foot); foot.appendChild(ext(L.youtube, "YouTube")); }
       sep(foot);
       if (me.admin) { foot.appendChild(link("/admin/", "Admin page")); sep(foot); }
+      if (me.guest && !me.admin && !me.user) {
+        foot.appendChild(document.createTextNode("Signed in with Google as " + me.guest.name + (me.guest.kind ? " (" + me.guest.kind + ")" : "")));
+        sep(foot);
+        var gout = el("button", "linkbtn", "Sign out"); gout.type = "button";
+        gout.addEventListener("click", function () { api("guest/logout", {}).then(function () {}, function () {}).then(function () { location.reload(); }); });
+        foot.appendChild(gout); sep(foot);
+      }
       if (me.admin || me.user) {
         if (me.user) { foot.appendChild(link("/account/", me.user.name)); sep(foot); }
         var out = el("button", "linkbtn", "Log out"); out.type = "button";
@@ -58,6 +67,20 @@ window.GB = (function () {
     tabs.forEach(function (t) { var a = link(t[0] + q, t[1]); if (t[2] === current) a.setAttribute("aria-current", "page"); box.appendChild(a); });
     box.hidden = false;
     return ev;
+  }
+  /* Sign in with Google: anyone can, to vote on photos and ask for them. First time, they say whether they are family or a guest. */
+  function googleSignIn(next) { location.href = "/api/google/signin?next=" + encodeURIComponent(next || (location.pathname + location.search)); }
+  function askKind() {
+    if (!me.guest || me.guest.kind || me.admin || me.user || $("kindBox")) return;
+    var box = el("div", "kindbox"); box.id = "kindBox"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Family or guest");
+    box.appendChild(el("p", null, "Welcome, " + me.guest.name + ". Are you family or a guest?"));
+    var row = el("div", "actions");
+    ["Family", "Guest"].forEach(function (k) {
+      var b = el("button", k === "Family" ? "primary" : "", k); b.type = "button";
+      b.addEventListener("click", function () { api("guest", { kind: k }).then(function () { me.guest.kind = k; box.remove(); draw(); }, function () { box.remove(); }); });
+      row.appendChild(b);
+    });
+    box.appendChild(row); document.body.appendChild(box);
   }
   function fire() { subs.forEach(function (f) { f(me.admin); }); }
   function onAdmin(f) { subs.push(f); f(me.admin); }
@@ -86,8 +109,10 @@ window.GB = (function () {
   }
 
   draw();
-  var ready = api("site").then(function (j) { site = j; me = j.me; draw(); fire(); return j; }, function () { return null; });
+  var ready = api("site").then(function (j) { site = j; me = j.me; draw(); fire(); askKind(); return j; }, function () { return null; });
   return { api: api, el: el, flash: flash, qs: qs, when: when, onAdmin: onAdmin, setAdmin: setAdmin, shrink: shrink, ready: ready, $: $, eventTabs: eventTabs,
     member: function () { return !!(me.user && me.user.status === "active"); },
+    voter: function () { return !!(me.admin || (me.user && me.user.status === "active") || me.guest); },
+    googleSignIn: googleSignIn,
     me: function () { return me; }, site: function () { return site; } };
 })();

@@ -2,6 +2,18 @@
   var $ = GB.$, el = GB.el, flash = GB.flash, E = GB.qs("e") || "durga-puja-2026", Q = "?e=" + encodeURIComponent(E);
   var admin = false, posts = [], loaded = false, busy = false, mayPost = true, needsApproval = true, blocked = false;
 
+  // The real post, drawn by Instagram or Facebook inside the card (public posts only). A layer on top makes the whole card open the post.
+  function embedUrl(u) {
+    try {
+      var x = new URL(u), m;
+      if (/(^|\.)instagram\.com$/.test(x.hostname) && (m = /^\/(p|reel|tv)\/([A-Za-z0-9_-]+)/.exec(x.pathname))) return "https://www.instagram.com/" + m[1] + "/" + m[2] + "/embed/";
+      if (/(^|\.)facebook\.com$/.test(x.hostname) || /fb\.watch$/.test(x.hostname)) {
+        var video = /\/(videos|watch|reel)\b/.test(x.pathname) || /fb\.watch$/.test(x.hostname);
+        return "https://www.facebook.com/plugins/" + (video ? "video" : "post") + ".php?href=" + encodeURIComponent(u) + "&show_text=false&width=500";
+      }
+    } catch (e) {}
+    return "";
+  }
   function platform(u) {
     var h = host(u);
     return /instagram\.com$/.test(h) ? "Instagram" : /(facebook\.com|fb\.watch)$/.test(h) ? "Facebook" : /(youtube\.com|youtu\.be)$/.test(h) ? "YouTube" : h;
@@ -23,6 +35,11 @@
         var pic = el(p.link ? "a" : "div", "post-pic");
         if (p.link) { pic.href = p.link; pic.target = "_blank"; pic.rel = "noopener nofollow ugc"; pic.setAttribute("aria-label", "Open on " + plat); }
         if (p.photo) { var im = el("img"); im.src = "/api/photo/" + p.id + Q; im.alt = p.link ? "Preview of the " + plat + " post shared by " + p.name : "Photo shared by " + p.name; im.loading = "lazy"; pic.appendChild(im); }
+        else if (embedUrl(p.link)) {
+          var fr = el("iframe", "post-embed"); fr.src = embedUrl(p.link); fr.loading = "lazy"; fr.title = plat + " post shared by " + p.name;
+          fr.setAttribute("scrolling", "no"); fr.setAttribute("tabindex", "-1"); fr.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+          pic.appendChild(fr); pic.classList.add("embed");
+        }
         else { var ph = el("div", "post-ph"); ph.appendChild(el("b", null, plat)); ph.appendChild(el("span", null, "Tap to open")); pic.appendChild(ph); }
         if (p.link) pic.appendChild(el("span", "post-badge", plat));
         card.appendChild(pic);

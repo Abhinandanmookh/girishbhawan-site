@@ -20,11 +20,25 @@
     <div>
       <nav class="tabs" id="evTabs" aria-label="Event pages" hidden></nav>
       <h1 id="evTitle">Photos and videos</h1>
-      <p class="sub">Previews carry a small Girish Bhawan mark. Full-size photos can be downloaded by family members the admin has approved.</p>
+      <p class="sub">Tap a photo or video to see it larger, like it, or ask the admin for a copy.</p>
     </div>
   </header>
 
-  <p class="notebox" id="dlState" hidden></p>
+  <p class="notebox" id="whoBar" hidden></p>
+  <p class="notebox" id="blockedMsg" hidden>This album is for family members. Log in with an approved account to see it.</p>
+
+  <section id="adminBar" hidden>
+    <div class="admin">
+      <div class="actions">
+        <button type="button" class="primary" id="numberBtn">Number the photos</button>
+        <button type="button" id="refreshBtn">Refresh from Drive and YouTube</button>
+      </div>
+      <p class="hint">Numbering renames the photos in the Drive Images folder in date order (for example DurgaPuja2026_0001), so a request for a number points to one photo. Run it after you finish adding photos; photos already numbered keep their number.</p>
+      <p class="hint" id="plNote" hidden>No YouTube playlist is linked to this event yet. Add it on the admin page under Events.</p>
+      <div class="msg err" id="adminErr" hidden></div>
+      <div class="msg" id="numMsg" role="status"></div>
+    </div>
+  </section>
 
   <section id="upSec" hidden>
     <h2>Add to the album</h2>
@@ -32,34 +46,43 @@
       <form id="phForm" novalidate>
         <strong>Photos</strong>
         <label class="f" for="phFiles"><span class="label">Choose one or more photos</span><input type="file" id="phFiles" accept="image/*" multiple></label>
-        <label class="f" for="phCap"><span class="label">Caption (optional, applies to all)</span><input id="phCap" maxlength="300" autocomplete="off" placeholder="For example: Saptami arati"></label>
+        <label class="f" for="phCap"><span class="label">Caption (optional, applies to all)</span><input id="phCap" maxlength="100" autocomplete="off" placeholder="For example: Saptami arati"></label>
+        <p class="hint" id="upHint"></p>
         <div class="actions"><button class="primary" type="submit">Upload photos</button></div>
         <div class="msg" id="phMsg" role="status"></div>
       </form>
       <form id="vdForm" novalidate>
         <strong>Video</strong>
-        <label class="f" for="vdLink"><span class="label">Google Drive or YouTube link</span><input id="vdLink" inputmode="url" autocomplete="off" placeholder="https://drive.google.com/..."></label>
-        <label class="f" for="vdFile"><span class="label">The same video from your phone (optional, for the thumbnail)</span><input type="file" id="vdFile" accept="video/*"></label>
-        <label class="f" for="vdCap"><span class="label">Caption (optional)</span><input id="vdCap" maxlength="300" autocomplete="off"></label>
-        <p class="hint">Videos stay in Google Drive or YouTube; the file you choose is only used to make the thumbnail and is not uploaded. In Drive, keep the video "Restricted" and people will see a Request access button.</p>
-        <div class="actions"><button class="primary" type="submit">Add video</button></div>
+        <label class="f" for="vdFile"><span class="label">Choose a video</span><input type="file" id="vdFile" accept="video/*"></label>
+        <label class="f" for="vdCap"><span class="label">What is it? (optional)</span><input id="vdCap" maxlength="100" autocomplete="off"></label>
+        <p class="hint">Videos go to the admin first, who adds them to the album's YouTube playlist. Keep the page open until the upload finishes.</p>
+        <div class="actions"><button class="primary" type="submit">Upload video</button></div>
         <div class="msg" id="vdMsg" role="status"></div>
       </form>
     </div>
   </section>
 
-  <section>
-    <div class="msg" id="pageMsg" role="status"></div>
-    <div class="gallery no-save" id="grid"></div>
+  <div class="msg" id="pageMsg" role="status"></div>
+  <section id="videoSec">
+    <h2>Videos <span class="label" id="videoCount"></span></h2>
+    <div class="gallery no-save" id="videoGrid"></div>
+  </section>
+  <section id="photoSec">
+    <h2>Photos <span class="label" id="photoCount"></span></h2>
+    <div class="gallery no-save" id="photoGrid"></div>
   </section>
 
-  <dialog id="lb" class="lightbox no-save" aria-label="Photo">
-    <div class="lb-top"><button type="button" class="small" id="lbClose">Close</button></div>
+  <dialog id="lb" class="lightbox no-save" aria-label="Photo or video">
+    <div class="lb-top"><strong id="lbCode"></strong><button type="button" class="small" id="lbClose">Close</button></div>
     <div id="lbMedia"></div>
-    <p class="post-text" id="lbCap"></p>
     <p class="post-meta" id="lbMeta"></p>
     <div class="actions" id="lbAct"></div>
+    <div class="reqbox" id="reqBox" hidden>
+      <label class="f" for="reqNote"><span class="label">Message for the admin (optional)</span><input id="reqNote" maxlength="300" autocomplete="off" placeholder="For example: please send it on WhatsApp"></label>
+      <div class="actions"><button type="button" class="primary" id="reqSend">Send request</button></div>
+    </div>
     <div class="msg" id="lbMsg" role="status"></div>
+    <div class="actions" id="lbAdmin" hidden></div>
   </dialog>
   <footer id="siteFoot">Girish Bhawan, Bhowanipore, Kolkata</footer>
 </div>

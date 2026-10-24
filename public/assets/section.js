@@ -10,7 +10,10 @@
       $("upSec").hidden = !j.mayUpload;
       var box = $("files"); box.textContent = "";
       if (!j.files.length) { box.appendChild(el("p", "empty", "No documents have been added yet.")); return; }
-      j.files.forEach(function (f) {
+      // Newest year first; within a year, newest document first
+      var yearOf = function (f) { return f.year || new Date(f.ts).getFullYear(); }, last = null;
+      j.files.slice().sort(function (a, b) { return yearOf(b) - yearOf(a) || b.ts - a.ts; }).forEach(function (f) {
+        if (yearOf(f) !== last) { last = yearOf(f); box.appendChild(el("h3", "file-year", String(last))); }
         var row = el("div", "filerow"), main = el("div", "filemain");
         var a = el("a", "post-link", f.name); a.href = "/api/file/" + encodeURIComponent(SID) + "/" + f.id; main.appendChild(a);
         if (f.note) main.appendChild(el("span", "note", f.note));
@@ -45,10 +48,12 @@
     r.onerror = function () { flash($("upMsg"), "Could not read that file.", true); };
     r.onload = function () {
       var data = String(r.result).split(",")[1] || "";
-      GB.api("files" + Q, { name: f.name, note: $("upNote").value, data: data }).then(function () { $("upFile").value = ""; $("upNote").value = ""; flash($("upMsg"), "Uploaded."); load(); },
+      GB.api("files" + Q, { name: f.name, note: $("upNote").value, year: $("upYear").value, data: data }).then(function () { $("upFile").value = ""; $("upNote").value = ""; flash($("upMsg"), "Uploaded."); load(); },
         function (e) { flash($("upMsg"), e.status === 401 || e.status === 403 ? "You are not allowed to upload here." : "Could not upload. Try again.", true); });
     };
     r.readAsDataURL(f);
   });
+  var ys = $("upYear"), now = new Date().getFullYear();
+  for (var y = now + 1; y >= now - 40; y--) { var o = el("option", null, String(y)); o.value = y; if (y === now) o.selected = true; ys.appendChild(o); }
   GB.ready.then(function (site) { admin = !!(site && site.me.admin); load(); });
 })();

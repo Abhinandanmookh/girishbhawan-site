@@ -1,6 +1,7 @@
 // Girish Bhawan site API. Storage is injected so the same code runs on Netlify (Blobs) and in local tests.
 // Everything the admin may want to change later (sizes, prices, events, sections, groups, links) is data, not code.
 import crypto from "node:crypto";
+import { createGoogle } from "./google.mjs";
 
 const LEGACY = "durga-puja-2026"; // first event; its data lives under the original storage keys
 const ADMIN_USER = "admin";
@@ -12,14 +13,17 @@ const DEFAULT_ORDERS = {
     { name: "Bubul (Prabal)", note: "", XL: 1, XXL: 1, received: 650, paidOn: "2026-10-06" },
   ],
 };
+// Folders and playlist created for Durga Puja 2026 before the site managed them.
+const LEGACY_MEDIA = { driveFolder: "17uyZW7mpq9OWtCDH6z4ASNNCOf4PxmcD", driveImages: "1-zwvetofASAQcKXL9aceB05HDmeVea5b", driveVideos: "1PUWLhX_Ll9Be-sGWHLb97coM77bfieAK", playlist: "PLE4jPQpbQERs" };
 const DEFAULT_SITE = {
-  links: { facebook: "https://www.facebook.com/girishbhawan", instagram: "https://www.instagram.com/girishbhawan/" },
+  links: { facebook: "https://www.facebook.com/girishbhawan", instagram: "https://www.instagram.com/girishbhawan/", youtube: "https://www.youtube.com/@GirishBhawan" },
   groups: [{ id: "girish-bhawan", name: "Girish Bhawan Group" }, { id: "padmarani", name: "Padmarani Group" }],
   sections: [
     { id: "pujo-accounts", title: "Pujo Accounts", desc: "Accounts of the Pujo.", access: "admin", groups: [], memberUpload: false },
     { id: "bhog-accounts", title: "Bhog Accounts", desc: "Accounts of the Bhog.", access: "admin", groups: [], memberUpload: false },
   ],
-  events: [{ id: LEGACY, title: "Durga Puja 2026", sub: "Photos, links and greetings from the family.", schedule: true, access: "public", groups: [], post: "anyone", autoApprove: false }],
+  events: [{ id: LEGACY, year: 2026, occasion: "Durga Puja", sub: "Photos, links and greetings from the family.", schedule: true, access: "public", groups: [], post: "anyone", autoApprove: false }],
+  drive: { root: "1juT3cDBFY1BNy96pyLfhbsjc51wwVrr2" },
 };
 const DEFAULT_ITEMS = [{ id: "tshirt", name: "T-shirt" }, { id: "kurti", name: "Kurti" }];
 function cleanItems(v) {
@@ -90,6 +94,10 @@ function cleanSchedule(input) {
   }
   return d;
 }
+const driveId = (v) => { const m = /(?:folders\/|id=)?([A-Za-z0-9_-]{10,80})/.exec(String(v ?? "").trim()); return m && /^[A-Za-z0-9_-]{10,80}$/.test(m[1]) ? m[1] : ""; };
+const playlistId = (v) => { const t = String(v ?? "").trim(); const m = /[?&]list=([A-Za-z0-9_-]{8,64})/.exec(t) || /^([A-Za-z0-9_-]{8,64})$/.exec(t); return m ? m[1] : ""; };
+const folderPrefix = (ev) => ev.occasion.replace(/[^A-Za-z0-9]+/g, "") + ev.year;
+const utf8cut = (v, bytes) => { let t = String(v ?? ""); while (Buffer.byteLength(t) > bytes) t = t.slice(0, -1); return t; };
 function uniqueId(wanted, title, taken, fallback) {
   let base = /^[a-z0-9-]{1,40}$/.test(String(wanted || "")) ? wanted : slug(title) || fallback, id = base, n = 2;
   while (taken.has(id)) id = (base.slice(0, 36) + "-" + n++);
@@ -98,7 +106,8 @@ function uniqueId(wanted, title, taken, fallback) {
 }
 function cleanSite(input) {
   const src = input && typeof input === "object" ? input : {};
-  const d = { links: { facebook: httpsUrl(src.links?.facebook), instagram: httpsUrl(src.links?.instagram) }, groups: [], sections: [], events: [] };
+  const d = { links: { facebook: httpsUrl(src.links?.facebook), instagram: httpsUrl(src.links?.instagram), youtube: httpsUrl(src.links?.youtube) }, groups: [], sections: [], events: [],
+    drive: { root: driveId(src.drive?.root) || DEFAULT_SITE.drive.root } };
   let taken = new Set();
   for (const g of Array.isArray(src.groups) ? src.groups.slice(0, 20) : []) { const name = txt(g?.name, 60); if (name) d.groups.push({ id: uniqueId(g?.id, name, taken, "group"), name }); }
   const gids = new Set(d.groups.map((g) => g.id));
@@ -110,9 +119,17 @@ function cleanSite(input) {
     if (title) d.sections.push({ id: uniqueId(s?.id, title, taken, "section"), title, desc: txt(s?.desc, 200), access: access(s?.access, "admin"), groups: groupsOf(s?.groups), memberUpload: !!s?.memberUpload });
   }
   taken = new Set();
-  for (const e of Array.isArray(src.events) ? src.events.slice(0, 30) : []) {
-    const title = txt(e?.title, 60);
-    if (title) d.events.push({ id: uniqueId(e?.id, title, taken, "event"), title, sub: txt(e?.sub, 200), schedule: !!e?.schedule, access: access(e?.access, "public"), groups: groupsOf(e?.groups), post: e?.post === "members" ? "members" : "anyone", autoApprove: !!e?.autoApprove });
+  for (const e of Array.isArray(src.events) ? src.events.slice(0, 60) : []) {
+    // An event is a year plus an occasion ("Durga Puja", "Jagaddhatri Puja"); older saves only had a title like "Durga Puja 2026".
+    const oldTitle = txt(e?.title, 60), yearIn = Math.floor(Number(e?.year));
+    const year = yearIn >= 1900 && yearIn <= 2100 ? yearIn : Number((/\b(19|20)\d{2}\b/.exec(oldTitle) || [])[0]) || new Date().getFullYear();
+    const occasion = txt(e?.occasion, 50) || txt(oldTitle.replace(/\b(19|20)\d{2}\b/, ""), 50);
+    if (!occasion) continue;
+    const title = occasion + " " + year, legacy = e?.id === LEGACY ? LEGACY_MEDIA : {};
+    d.events.push({ id: uniqueId(e?.id, title, taken, "event"), year, occasion, title, sub: txt(e?.sub, 200), schedule: !!e?.schedule, access: access(e?.access, "public"), groups: groupsOf(e?.groups),
+      post: e?.post === "members" ? "members" : "anyone", autoApprove: !!e?.autoApprove,
+      driveFolder: driveId(e?.driveFolder) || legacy.driveFolder || "", driveImages: driveId(e?.driveImages) || legacy.driveImages || "", driveVideos: driveId(e?.driveVideos) || legacy.driveVideos || "",
+      playlist: playlistId(e?.playlist) || (e?.playlist === undefined ? legacy.playlist || "" : "") });
   }
   return d;
 }
@@ -120,7 +137,7 @@ function csv(rows) {
   const cell = (v) => { let s = String(v ?? ""); if (/^[=+\-@]/.test(s) && typeof v !== "number") s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   return "﻿" + rows.map((r) => r.map(cell).join(",")).join("\r\n");
 }
-const isBinaryKey = (k) => /^(photo\/|pending-photo\/|file\/|item-img\/)/.test(k) || /^album\/[^/]+\/(orig|prev|thumb)\//.test(k) || k === "schedule-image" || /^wall\/[^/]+\/(photo|pending)\//.test(k) || /^sched\/[^/]+\/image$/.test(k);
+const isBinaryKey = (k) => /^(photo\/|pending-photo\/|file\/|item-img\/|storyimg\/|dthumb\/)/.test(k) || /^album\/[^/]+\/(orig|prev|thumb)\//.test(k) || k === "schedule-image" || /^wall\/[^/]+\/(photo|pending)\//.test(k) || /^sched\/[^/]+\/image$/.test(k);
 function imgType(buf) {
   const b = new Uint8Array(buf, 0, Math.min(12, buf.byteLength));
   if (b[0] === 0xff && b[1] === 0xd8) return "image/jpeg";
@@ -156,7 +173,8 @@ async function fetchPreview(link) {
     return m ? await fetchImage(m[1].replace(/&amp;/g, "&")) : null;
   } catch { return null; }
 }
-const isTransientKey = (k) => /^(rate|fails)\//.test(k);
+// Left out of backups: counters, caches, and the Google connection key (reconnect after a restore instead).
+const isTransientKey = (k) => /^(rate|fails|dthumb|albumcache|oauthstate|google)\//.test(k);
 const validKey = (k) => typeof k === "string" && k.length < 200 && /^[A-Za-z0-9._\/-]+$/.test(k) && !k.includes("..");
 
 export function createApp(getStore, env) {
@@ -206,6 +224,21 @@ export function createApp(getStore, env) {
     return { admin: false, user: u };
   }
   const active = (who) => !!who.user && who.user.status === "active";
+  const g = createGoogle(env, store, env.__fetch);
+  const gCookie = (value, maxAge) => `gbg=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+  async function guestOf(req) {
+    const m = /(?:^|;\s*)gbg=([A-Za-z0-9_-]+)\.([0-9a-f]{64})/.exec(req.headers.get("cookie") || "");
+    if (!m) return null;
+    const a = Buffer.from(m[2], "hex"), b = Buffer.from(sign("g|" + m[1]), "hex");
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+    let p; try { p = JSON.parse(Buffer.from(m[1], "base64url").toString()); } catch { return null; }
+    if (!p || p.exp < Date.now() || !/^[0-9a-f]{24}$/.test(String(p.g))) return null;
+    const gu = await store().get("guest/" + p.g, { type: "json" });
+    return gu && !gu.blocked ? gu : null;
+  }
+  // Who is voting or asking: the admin, an approved family account, or someone signed in with Google.
+  const voterOf = (who) => (who.admin ? "admin" : active(who) ? "u-" + who.user.id : who.guest ? "g-" + who.guest.id : "");
+  const personOf = (who) => (who.admin ? { name: "Admin", email: "", kind: "Family" } : active(who) ? { name: who.user.name, email: who.user.login, kind: "Family" } : who.guest ? { name: who.guest.name, email: who.guest.email, kind: who.guest.kind || "Not said" } : null);
   function canSee(item, who) {
     if (!item) return false;
     if (item.access === "public" || who.admin) return true;
@@ -221,17 +254,128 @@ export function createApp(getStore, env) {
       const seg = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean);
       const route = seg[0] || "", GET = req.method === "GET", POST = req.method === "POST";
       const s = store(), who = await whoIs(req), admin = who.admin;
+      who.guest = await guestOf(req);
+      const origin = url.origin;
       const deny = () => json(who.admin || who.user ? 403 : 401, { error: "login required" });
 
       /* ---------- who am I, what can I see ---------- */
       if (route === "site" && GET) {
         const site = await getSite();
         return json(200, {
-          me: { admin, user: who.user ? publicUser(who.user) : null },
+          me: { admin, user: who.user ? publicUser(who.user) : null, guest: who.guest ? { name: who.guest.name, email: who.guest.email, kind: who.guest.kind || "" } : null },
+          googleSignIn: g.configured(),
           links: site.links, groups: site.groups,
-          events: site.events.filter((e) => canSee(e, who)).map((e) => ({ id: e.id, title: e.title, sub: e.sub, schedule: e.schedule, post: e.post })),
+          events: site.events.filter((e) => canSee(e, who)).map((e) => ({ id: e.id, title: e.title, year: e.year, occasion: e.occasion, sub: e.sub, schedule: e.schedule, post: e.post })),
           sections: site.sections.filter((x) => canSee(x, who)).map((x) => ({ id: x.id, title: x.title, desc: x.desc })),
         });
+      }
+
+      /* ---------- Google: admin connects Drive and YouTube; visitors sign in to vote and ask for photos ---------- */
+      if (route === "google") {
+        const act = seg[1] || "";
+        const back = (path) => new Response(null, { status: 302, headers: { location: path, "cache-control": "no-store" } });
+        if ((act === "connect" || act === "signin") && GET) {
+          if (!g.configured()) return back(act === "connect" ? "/admin/?google=notset" : "/?google=notset");
+          if (act === "connect" && !admin) return back("/account/");
+          let next = url.searchParams.get("next") || "/";
+          if (!/^\/[A-Za-z0-9/_?=&.%-]*$/.test(next) || next.startsWith("//")) next = "/";
+          const state = crypto.randomBytes(18).toString("hex");
+          await s.setJSON("oauthstate/" + state, { kind: act, next: act === "connect" ? "/admin/" : next, exp: Date.now() + 15 * 60000 });
+          return back(g.authUrl(origin, state, act));
+        }
+        if (act === "callback" && GET) {
+          const state = url.searchParams.get("state") || "", code = url.searchParams.get("code") || "";
+          const st = /^[0-9a-f]{36}$/.test(state) ? await s.get("oauthstate/" + state, { type: "json" }) : null;
+          if (st) await s.delete("oauthstate/" + state);
+          if (!st || st.exp < Date.now()) return back("/?google=expired");
+          if (!code) return back(st.next + (st.next.includes("?") ? "&" : "?") + "google=cancelled");
+          const tok = await g.exchange(code, origin), info = g.idInfo(tok.id_token) || {};
+          if (st.kind === "connect") {
+            if (!tok.refresh_token) return back("/admin/?google=norefresh");
+            await s.setJSON("google/conn", { refresh: tok.refresh_token, email: info.email || "", scope: tok.scope || "", ts: Date.now() });
+            for (const k of await keys("albumcache/")) await s.delete(k); // albums read Drive again straight away
+            return back("/admin/?google=connected");
+          }
+          if (!info.sub || !info.email || info.email_verified === false) return back(st.next);
+          const gid = sha("guest|" + info.sub).toString("hex").slice(0, 24), old = (await s.get("guest/" + gid, { type: "json" })) || {};
+          await s.setJSON("guest/" + gid, { ...old, id: gid, name: txt(info.name || old.name || info.email.split("@")[0], 60), email: txt(info.email, 120), kind: old.kind || "", created: old.created || Date.now(), seen: Date.now() });
+          const pl = Buffer.from(JSON.stringify({ g: gid, exp: Date.now() + 60 * 86400000 })).toString("base64url");
+          return new Response(null, { status: 302, headers: { location: st.next, "set-cookie": gCookie(pl + "." + sign("g|" + pl), 60 * 86400), "cache-control": "no-store" } });
+        }
+        if (act === "status" && GET) {
+          if (!admin) return deny();
+          const c = await g.connection();
+          return json(200, { configured: g.configured(), connected: !!(c && c.refresh), email: c ? c.email : "", since: c ? c.ts : 0 });
+        }
+        if (act === "disconnect" && POST) {
+          if (!(await body(req))) return json(400, { error: "bad request" });
+          if (!admin) return deny();
+          await s.delete("google/conn");
+          return json(200, { ok: true });
+        }
+      }
+      if (route === "guest" && POST) {
+        const b = await body(req);
+        if (!b) return json(400, { error: "bad request" });
+        if (seg[1] === "logout") return json(200, { ok: true }, { "set-cookie": gCookie("x", 0) });
+        if (!who.guest) return deny();
+        const kind = b.kind === "Family" ? "Family" : b.kind === "Guest" ? "Guest" : "";
+        if (!kind) return json(400, { error: "kind" });
+        await s.setJSON("guest/" + who.guest.id, { ...who.guest, kind, name: txt(b.name, 60) || who.guest.name });
+        return json(200, { ok: true });
+      }
+
+      /* ---------- Our story: a timeline anyone can add to, shown once the admin approves ---------- */
+      if (route === "story") {
+        const act = seg[1] || "", list = async () => (await Promise.all((await keys("story/")).map((k) => s.get(k, { type: "json" })))).filter(Boolean);
+        if (!act && GET) {
+          const all = (await list()).filter((x) => admin || x.status === "approved");
+          all.sort((a, b) => a.year - b.year || (a.month || 0) - (b.month || 0) || (a.day || 0) - (b.day || 0) || a.ts - b.ts);
+          return json(200, { entries: all });
+        }
+        if (act === "img" && GET) {
+          const id = seg[2] || "";
+          if (!/^[0-9a-f]{16}$/.test(id)) return new Response("Not found", { status: 404 });
+          const meta = await s.get("story/" + id, { type: "json" });
+          if (!meta || (meta.status !== "approved" && !admin)) return new Response("Not found", { status: 404 });
+          const img = await s.get("storyimg/" + id, { type: "arrayBuffer" });
+          return img ? new Response(img, { status: 200, headers: { "content-type": "image/jpeg", "x-content-type-options": "nosniff", "cache-control": meta.status === "approved" ? "public, max-age=86400" : "no-store" } }) : new Response("Not found", { status: 404 });
+        }
+        if (!POST) return json(404, { error: "not found" });
+        const b = await body(req);
+        if (!b) return json(400, { error: "bad request" });
+        const clean = (x, prev) => {
+          const year = Math.floor(Number(x.year)), month = Math.floor(Number(x.month)) || 0, day = Math.floor(Number(x.day)) || 0;
+          if (!(year >= 1700 && year <= new Date().getFullYear() + 1)) return null;
+          if (month < 0 || month > 12 || day < 0 || day > 31 || (day && !month)) return null;
+          const title = txt(x.title, 120), text = multiline(x.text, 3000);
+          if (!title && !text) return null;
+          return { ...prev, year, month, day, title, text, name: txt(x.name, 60) || (prev && prev.name) || "" };
+        };
+        if (!act) {
+          if (txt(b.website, 10)) return json(200, { ok: true });
+          const person = personOf(who), entry = clean(b, {});
+          if (!entry) return json(400, { error: "fields" });
+          if (!entry.name && person) entry.name = person.name;
+          if (!entry.name) return json(400, { error: "name" });
+          let img = null;
+          if (b.photo) { img = jpeg(b.photo, 1048576); if (!img) return json(400, { error: "photo" }); }
+          if (!admin && (await overLimit("rate/story-" + ipKey(req, ctx), 5, 3600000, true))) return json(429, { error: "too many" });
+          const id = crypto.randomBytes(8).toString("hex");
+          if (img) await s.set("storyimg/" + id, img);
+          await s.setJSON("story/" + id, { id, ...entry, photo: !!img, ts: Date.now(), status: admin ? "approved" : "pending", email: person ? person.email : "" });
+          return json(200, { ok: true, status: admin ? "approved" : "pending" });
+        }
+        if (act === "moderate") {
+          if (!admin) return deny();
+          const id = String(b.id || ""), meta = /^[0-9a-f]{16}$/.test(id) ? await s.get("story/" + id, { type: "json" }) : null;
+          if (!meta) return json(404, { error: "not found" });
+          if (b.action === "delete") { await s.delete("story/" + id); await s.delete("storyimg/" + id); return json(200, { ok: true }); }
+          if (b.action === "approve") { await s.setJSON("story/" + id, { ...meta, status: "approved" }); return json(200, { ok: true }); }
+          if (b.action === "edit") { const e2 = clean(b, meta); if (!e2) return json(400, { error: "fields" }); await s.setJSON("story/" + id, e2); return json(200, { ok: true }); }
+          return json(400, { error: "action" });
+        }
+        return json(404, { error: "not found" });
       }
 
       /* ---------- accounts ---------- */
@@ -498,67 +642,161 @@ export function createApp(getStore, env) {
           return new Response(img, { status: 200, headers: { "content-type": imgType(img) || "image/jpeg", "x-content-type-options": "nosniff", "cache-control": pub ? "public, max-age=3600" : "private, no-store" } });
         }
 
-        /* ---------- album: photos and videos with download by permission ---------- */
+        /* ---------- album: photos from Drive, videos from YouTube; thumbnails only, votes, and requests to the admin ---------- */
         if (route === "album") {
-          const metaPrefix = `album/${e}/meta/`, grantKey = (uid) => `grant/${e}/${uid}`, reqKey = (uid) => `dlreq/${e}/${uid}`;
-          const uid = active(who) ? who.user.id : "";
-          const canDownload = admin || (!!uid && !!(await s.get(grantKey(uid), { type: "json" })));
-          const findMeta = async (id) => (await keys(metaPrefix)).find((x) => x.endsWith("-" + id));
-          const act = seg[1] || "";
-          if (!act && GET) {
-            const items = (await Promise.all((await keys(metaPrefix)).slice(0, 1000).map((k) => s.get(k, { type: "json" })))).filter(Boolean);
-            return json(200, { items, mayUpload: admin || !!uid, canDownload, requested: !!uid && !canDownload && !!(await s.get(reqKey(uid), { type: "json" })), me: uid });
+          const act = seg[1] || "", voter = voterOf(who), prefix = folderPrefix(ev);
+          const hideKey = `albumhide/${e}`, sumKey = `votesum/${e}`, cacheKey = `albumcache/${e}`;
+          const numbered = new RegExp("^" + prefix + "_(\\d{4,})\\.", "i");
+          const sortTs = (f) => {
+            const m = /(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})(?:\((\d+)\))?/.exec(f.name);
+            if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + (+m[7] || 0);
+            const t = f.imageMediaMetadata && /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(f.imageMediaMetadata.time || "");
+            if (t) return Date.UTC(+t[1], +t[2] - 1, +t[3], +t[4], +t[5], +t[6]);
+            return Date.parse(f.createdTime || "") || 0;
+          };
+          async function media(fresh) {
+            const old = await s.get(cacheKey, { type: "json" });
+            if (old && !fresh && Date.now() - old.ts < 5 * 60000) return old;
+            const c = { ts: Date.now(), photos: old ? old.photos : [], videos: old ? old.videos : [], err: "" };
+            if (g.configured() && (await g.connection())) {
+              if (ev.driveImages) {
+                try {
+                  c.photos = (await g.listFolder(ev.driveImages)).filter((f) => /^image\//.test(f.mimeType)).map((f) => {
+                    const ap = f.appProperties || {}, n = numbered.exec(f.name);
+                    return { fid: f.id, name: f.name, n: n ? +n[1] : 0, ts: sortTs(f), st: ap.gbStatus || "approved", by: ap.gbBy || "", cap: ap.gbCaption || "" };
+                  }).sort((a, b) => (a.n || 1e9) - (b.n || 1e9) || a.ts - b.ts);
+                } catch (err) { c.err = err.message; }
+              }
+              if (ev.playlist) { try { c.videos = await g.playlist(ev.playlist); } catch (err) { c.err = c.err || err.message; } }
+            } else c.err = "Google Drive is not connected yet.";
+            await s.setJSON(cacheKey, c);
+            return c;
           }
-          if (["thumb", "prev", "orig"].includes(act) && GET) {
+          const legacyItems = async () => (await Promise.all((await keys(`album/${e}/meta/`)).map((k) => s.get(k, { type: "json" })))).filter((m) => m && m.kind === "photo" && m.thumb);
+
+          if (!act && GET) {
+            const c = await media(admin && url.searchParams.get("fresh") === "1"), hidden = (await s.get(hideKey, { type: "json" })) || {};
+            const sum = (await s.get(sumKey, { type: "json" })) || {}, mine = voter ? (await s.get(`myvotes/${e}/${voter}`, { type: "json" })) || {} : {};
+            const items = [];
+            for (const p of c.photos) {
+              if (!admin && (p.st !== "approved" || hidden["d-" + p.fid])) continue;
+              items.push({ id: "d-" + p.fid, kind: "photo", code: p.name.replace(/\.[^.]+$/, ""), cap: p.cap, by: p.by, ts: p.ts,
+                thumb: `/api/album/dthumb/${p.fid}?e=${e}&s=400`, view: `/api/album/dthumb/${p.fid}?e=${e}&s=1000`,
+                ...(admin ? { pending: p.st !== "approved", hidden: !!hidden["d-" + p.fid], drive: `https://drive.google.com/file/d/${p.fid}/view` } : {}) });
+            }
+            for (const m of await legacyItems()) {
+              if (!admin && hidden["s-" + m.id]) continue;
+              items.push({ id: "s-" + m.id, kind: "photo", code: "Site photo " + m.id.slice(0, 4).toUpperCase(), cap: m.caption || "", by: m.byName || "", ts: m.ts,
+                thumb: `/api/album/thumb/${m.id}?e=${e}`, view: `/api/album/prev/${m.id}?e=${e}`, ...(admin ? { hidden: !!hidden["s-" + m.id] } : {}) });
+            }
+            const videos = [];
+            for (const v of c.videos) {
+              if (!admin && hidden["y-" + v.id]) continue;
+              videos.push({ id: "y-" + v.id, kind: "video", yt: v.id, code: v.title, ts: v.ts, thumb: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`, ...(admin ? { hidden: !!hidden["y-" + v.id] } : {}) });
+            }
+            for (const it of items.concat(videos)) { const v = sum[it.id] || { u: 0, d: 0 }; it.up = v.u; it.down = v.d; it.mine = mine[it.id] || 0; }
+            const person = personOf(who);
+            return json(200, { photos: items, videos, me: voter ? { voter, name: person.name, kind: person.kind, guest: !!who.guest && !admin && !active(who) } : null,
+              mayUpload: !!voter, uploadsNeedApproval: !admin && !active(who), driveReady: !!ev.driveImages, ...(admin ? { err: c.err, cachedAt: c.ts, playlist: ev.playlist } : {}) });
+          }
+          if (act === "dthumb" && GET) {
+            const fid = seg[2] || "", size = url.searchParams.get("s") === "1000" ? 1000 : 400;
+            if (!/^[A-Za-z0-9_-]{10,80}$/.test(fid)) return new Response("Not found", { status: 404 });
+            // Only pictures listed in this event's Images folder can be fetched, so no other Drive file is reachable through here.
+            const c = await media(false), p = c.photos.find((x) => x.fid === fid), hidden = (await s.get(hideKey, { type: "json" })) || {};
+            if (!p || (!admin && (p.st !== "approved" || hidden["d-" + fid]))) return new Response("Not found", { status: 404 });
+            const ck = `dthumb/${size}/${fid}`;
+            let img = await s.get(ck, { type: "arrayBuffer" });
+            if (!img) { img = await g.thumbnail(fid, size); if (!img) return new Response("Not ready", { status: 404 }); await s.set(ck, img); }
+            return new Response(img, { status: 200, headers: { "content-type": imgType(img) || "image/jpeg", "x-content-type-options": "nosniff", "cache-control": ev.access === "public" && p.st === "approved" ? "public, max-age=86400" : "private, no-store" } });
+          }
+          if (["thumb", "prev"].includes(act) && GET) {
             const id = seg[2] || "";
             if (!/^[0-9a-f]{16}$/.test(id)) return new Response("Not found", { status: 404 });
-            if (act === "orig" && !canDownload) return new Response("Ask the admin for download access first.", { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } });
             const img = await s.get(`album/${e}/${act}/${id}`, { type: "arrayBuffer" });
             if (!img) return new Response("Not found", { status: 404 });
-            const h = { "content-type": imgType(img) || "image/jpeg", "x-content-type-options": "nosniff", "cache-control": act === "orig" || ev.access !== "public" ? "private, no-store" : "public, max-age=86400" };
-            if (act === "orig") h["content-disposition"] = `attachment; filename="girish-bhawan-${e}-${id}.jpg"`;
-            return new Response(img, { status: 200, headers: h });
+            return new Response(img, { status: 200, headers: { "content-type": imgType(img) || "image/jpeg", "x-content-type-options": "nosniff", "cache-control": ev.access !== "public" ? "private, no-store" : "public, max-age=86400" } });
           }
           if (!POST) return json(404, { error: "not found" });
           const b = await body(req);
           if (!b) return json(400, { error: "bad request" });
-          if (!admin && !uid) return deny();
-          if (!act) {
-            const kind = b.kind === "video" ? "video" : "photo", caption = multiline(b.caption, 300);
-            let link = "";
-            if (kind === "video") { link = httpsUrl(b.link); if (!link) return json(400, { error: "link" }); }
-            let thumb = b.thumb ? jpeg(b.thumb, 300000) : null, prev = b.prev ? jpeg(b.prev, 900000) : null;
-            if ((b.thumb && !thumb) || (b.prev && !prev)) return json(400, { error: "photo" });
-            if (kind === "photo" && (!thumb || !prev)) return json(400, { error: "photo" });
-            if (kind === "video" && !thumb) { const yt = youtubeId(link); if (yt) { thumb = await fetchImage(`https://i.ytimg.com/vi/${yt}/hqdefault.jpg`); prev = thumb; } }
-            if (!admin && (await overLimit("rate/album-" + uid, 200, 3600000, true))) return json(429, { error: "too many" });
-            const id = crypto.randomBytes(8).toString("hex"), ts = Date.now();
-            if (thumb) await s.set(`album/${e}/thumb/${id}`, thumb);
-            if (prev) await s.set(`album/${e}/prev/${id}`, prev);
-            await s.setJSON(`${metaPrefix}${inv(ts)}-${id}`, { id, kind, link, caption, thumb: !!thumb, orig: false, ts, by: uid, byName: admin ? "Admin" : who.user.name });
-            return json(200, { ok: true, id });
-          }
-          if (act === "orig") {
-            const k = await findMeta(String(b.id || "")), m = k ? await s.get(k, { type: "json" }) : null;
-            if (!m || m.kind !== "photo" || (!admin && m.by !== uid)) return json(404, { error: "not found" });
-            const img = jpeg(b.orig, 4000000);
-            if (!img) return json(400, { error: "photo" });
-            await s.set(`album/${e}/orig/${m.id}`, img); await s.setJSON(k, { ...m, orig: true });
-            return json(200, { ok: true });
-          }
-          if (act === "delete") {
-            const k = await findMeta(String(b.id || "")), m = k ? await s.get(k, { type: "json" }) : null;
-            if (!m) return json(404, { error: "not found" });
-            if (!admin && m.by !== uid) return deny();
-            for (const part of ["thumb", "prev", "orig"]) await s.delete(`album/${e}/${part}/${m.id}`);
-            await s.delete(k);
-            return json(200, { ok: true });
+          const item = String(b.item || "");
+          const validItem = /^(d-[A-Za-z0-9_-]{10,80}|s-[0-9a-f]{16}|y-[A-Za-z0-9_-]{11})$/.test(item);
+
+          if (act === "vote") {
+            if (!voter) return json(401, { error: "sign in" });
+            if (!validItem) return json(400, { error: "item" });
+            const v = b.v === 1 || b.v === -1 ? b.v : 0;
+            if (!admin && (await overLimit("rate/vote-" + voter, 300, 3600000, true))) return json(429, { error: "too many" });
+            const mk = `myvotes/${e}/${voter}`, mine = (await s.get(mk, { type: "json" })) || {}, old = mine[item] || 0;
+            if (old === v) return json(200, { ok: true });
+            if (v) mine[item] = v; else delete mine[item];
+            await s.setJSON(mk, mine);
+            const sum = (await s.get(sumKey, { type: "json" })) || {}, cnt = sum[item] || { u: 0, d: 0 };
+            if (old === 1) cnt.u--; if (old === -1) cnt.d--; if (v === 1) cnt.u++; if (v === -1) cnt.d++;
+            cnt.u = Math.max(0, cnt.u); cnt.d = Math.max(0, cnt.d); sum[item] = cnt;
+            await s.setJSON(sumKey, sum);
+            return json(200, { ok: true, up: cnt.u, down: cnt.d });
           }
           if (act === "request") {
-            if (!uid) return deny();
-            if (!canDownload) await s.setJSON(reqKey(uid), { e, uid, ts: Date.now() });
+            if (!voter) return json(401, { error: "sign in" });
+            if (!validItem) return json(400, { error: "item" });
+            if (!admin && (await overLimit("rate/req-" + voter, 30, 3600000, true))) return json(429, { error: "too many" });
+            const person = personOf(who), id = crypto.randomBytes(8).toString("hex"), ts = Date.now();
+            await s.setJSON(`preq/${inv(ts)}-${id}`, { id, e, item, code: txt(b.code, 120), note: txt(b.note, 300), name: person.name, email: person.email, kind: person.kind, ts, status: "open" });
             return json(200, { ok: true });
           }
+          if (act === "upload") {
+            if (!voter) return json(401, { error: "sign in" });
+            if (!ev.driveImages) return json(409, { error: "no folder" });
+            const img = jpeg(b.photo, 4000000);
+            if (!img) return json(400, { error: "photo" });
+            if (!admin && (await overLimit("rate/up-" + voter, 300, 3600000, true))) return json(429, { error: "too many" });
+            const person = personOf(who), now = new Date(), stamp = now.toISOString().slice(0, 19).replace(/[T:]/g, "-");
+            const appProperties = { gbStatus: admin || active(who) ? "approved" : "pending", gbBy: utf8cut(person.name, 100), gbCaption: utf8cut(txt(b.caption, 100), 100) };
+            await g.uploadSmall(`UPLOAD-${stamp}-${crypto.randomBytes(2).toString("hex")}.jpg`, "image/jpeg", img, ev.driveImages, appProperties);
+            await s.delete(cacheKey);
+            return json(200, { ok: true, status: appProperties.gbStatus });
+          }
+          if (act === "video-start") {
+            if (!voter) return json(401, { error: "sign in" });
+            if (!ev.driveVideos) return json(409, { error: "no folder" });
+            const mime = /^video\/[a-z0-9.+-]{1,40}$/i.test(String(b.mime || "")) ? b.mime : "video/mp4", size = Math.floor(Number(b.size));
+            if (!(size > 0 && size < 10 * 1024 ** 3)) return json(400, { error: "size" });
+            const person = personOf(who), ext = (/\.([A-Za-z0-9]{2,5})$/.exec(String(b.name || "")) || [])[1] || "mp4";
+            const name = `VIDEO-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}-${utf8cut(person.name.replace(/[^A-Za-z0-9]+/g, ""), 30)}.${ext.toLowerCase()}`;
+            const upload = await g.resumableStart(name, mime, size, ev.driveVideos, origin, { gbBy: utf8cut(person.name, 100), gbCaption: utf8cut(txt(b.caption, 100), 100) });
+            if (!upload) return json(502, { error: "drive" });
+            return json(200, { ok: true, upload });
+          }
+          if (!admin) return deny();
+          if (act === "moderate") {
+            if (!validItem) return json(400, { error: "item" });
+            const hidden = (await s.get(hideKey, { type: "json" })) || {};
+            if (b.action === "hide" || b.action === "unhide") { if (b.action === "hide") hidden[item] = true; else delete hidden[item]; await s.setJSON(hideKey, hidden); return json(200, { ok: true }); }
+            if (b.action === "keep") { const ack = (await s.get(`flagack/${e}`, { type: "json" })) || {}, sum = (await s.get(sumKey, { type: "json" })) || {}; ack[item] = (sum[item] || {}).d || 0; await s.setJSON(`flagack/${e}`, ack); return json(200, { ok: true }); }
+            if (b.action === "approve" && item.startsWith("d-")) { await g.update(item.slice(2), { appProperties: { gbStatus: "approved" } }); await s.delete(cacheKey); return json(200, { ok: true }); }
+            if (b.action === "trash") {
+              if (item.startsWith("d-")) { await g.trash(item.slice(2)); await s.delete(cacheKey); }
+              else if (item.startsWith("s-")) { const id = item.slice(2), k = (await keys(`album/${e}/meta/`)).find((x) => x.endsWith("-" + id)); if (k) await s.delete(k); for (const part of ["thumb", "prev", "orig"]) await s.delete(`album/${e}/${part}/${id}`); }
+              else return json(400, { error: "Remove YouTube videos from the playlist on YouTube." });
+              return json(200, { ok: true });
+            }
+            return json(400, { error: "action" });
+          }
+          if (act === "number") {
+            // Gives every photo in the Images folder a short name in date order: DurgaPuja2026_0001.jpg, _0002 ...
+            const c = await media(true);
+            let max = c.photos.reduce((m, p) => Math.max(m, p.n), 0), done = 0;
+            const todo = c.photos.filter((p) => !p.n).sort((a, b) => a.ts - b.ts);
+            for (const p of todo.slice(0, 25)) {
+              const ext = ((/\.([A-Za-z0-9]{2,5})$/.exec(p.name) || [])[1] || "jpg").toLowerCase();
+              await g.update(p.fid, { name: `${prefix}_${String(++max).padStart(4, "0")}.${ext}` }); done++;
+            }
+            await s.delete(cacheKey);
+            return json(200, { ok: true, done, remaining: Math.max(0, todo.length - done) });
+          }
+          if (act === "refresh") { await s.delete(cacheKey); return json(200, { ok: true }); }
           return json(404, { error: "not found" });
         }
       }
@@ -583,7 +821,8 @@ export function createApp(getStore, env) {
           if (!buf.length || buf.length > MAX_FILE) return json(400, { error: "size" });
           const id = crypto.randomBytes(8).toString("hex"), ts = Date.now();
           await s.set(`file/${sid}/${id}`, ab(buf));
-          await s.setJSON(`fmeta/${sid}/${inv(ts)}-${id}`, { id, name, ext, size: buf.length, note: txt(b.note, 200), ts, by: admin ? "Admin" : who.user.name });
+          const yr = Math.floor(Number(b.year));
+          await s.setJSON(`fmeta/${sid}/${inv(ts)}-${id}`, { id, name, ext, size: buf.length, note: txt(b.note, 200), year: yr >= 1900 && yr <= 2100 ? yr : new Date(ts).getFullYear(), ts, by: admin ? "Admin" : who.user.name });
           return json(200, { ok: true });
         }
         if (route === "files" && POST && seg[1] === "delete") {
@@ -611,8 +850,19 @@ export function createApp(getStore, env) {
         const act = seg[1] || "";
         if (act === "state" && GET) {
           const users = (await Promise.all((await keys("user/")).map((k) => s.get(k, { type: "json" })))).filter(Boolean).sort((a, b) => b.created - a.created);
-          const requests = (await Promise.all((await keys("dlreq/")).map((k) => s.get(k, { type: "json" })))).filter(Boolean).sort((a, b) => a.ts - b.ts);
-          return json(200, { site: await getSite(), users: users.map(publicUser), requests });
+          const site = await getSite();
+          const preqs = (await Promise.all((await keys("preq/")).slice(0, 300).map((k) => s.get(k, { type: "json" })))).filter(Boolean);
+          // Photos and videos with five or more thumbs down that the admin has not yet reviewed
+          const flagged = [];
+          for (const ev2 of site.events) {
+            const sum = (await s.get(`votesum/${ev2.id}`, { type: "json" })) || {}, ack = (await s.get(`flagack/${ev2.id}`, { type: "json" })) || {};
+            const hidden = (await s.get(`albumhide/${ev2.id}`, { type: "json" })) || {};
+            for (const [item, c] of Object.entries(sum)) if (c.d >= 5 && c.d > (ack[item] || 0)) flagged.push({ e: ev2.id, event: ev2.title, item, up: c.u, down: c.d, hidden: !!hidden[item] });
+          }
+          const stories = (await Promise.all((await keys("story/")).map((k) => s.get(k, { type: "json" })))).filter((x) => x && x.status !== "approved").length;
+          const conn = await g.connection();
+          return json(200, { site, users: users.map(publicUser), preqs, flagged, pendingStories: stories,
+            google: { configured: g.configured(), connected: !!(conn && conn.refresh), email: conn ? conn.email : "" } });
         }
         if (act === "blob" && GET) {
           const k = url.searchParams.get("key");
@@ -628,13 +878,29 @@ export function createApp(getStore, env) {
         if (!POST) return json(404, { error: "not found" });
         const b = await body(req);
         if (!b) return json(400, { error: "bad request" });
-        if (act === "site") { const d = cleanSite(b); await s.setJSON("site", d); return json(200, { ok: true, site: d }); }
-        if (act === "request") {
-          const e = String(b.e || ""), uid = String(b.uid || "");
-          if (!/^[a-z0-9-]{1,40}$/.test(e) || !/^[0-9a-f]{16}$/.test(uid)) return json(400, { error: "bad request" });
-          if (b.action === "approve") await s.setJSON(`grant/${e}/${uid}`, { ts: Date.now() });
-          if (b.action === "revoke") await s.delete(`grant/${e}/${uid}`);
-          await s.delete(`dlreq/${e}/${uid}`);
+        if (act === "site") {
+          const d = cleanSite(b), problems = [];
+          if (g.configured() && (await g.connection())) {
+            for (const ev2 of d.events) {
+              if (ev2.driveImages && ev2.driveVideos) continue;
+              try {
+                const prefix = folderPrefix(ev2);
+                ev2.driveFolder = ev2.driveFolder || (await g.ensureFolder(prefix, d.drive.root));
+                ev2.driveImages = ev2.driveImages || (await g.ensureFolder(prefix + "_Images", ev2.driveFolder));
+                ev2.driveVideos = ev2.driveVideos || (await g.ensureFolder(prefix + "_Videos", ev2.driveFolder));
+              } catch (err) { problems.push(ev2.title + ": " + err.message); }
+            }
+          }
+          await s.setJSON("site", d);
+          for (const k of await keys("albumcache/")) await s.delete(k); // a changed playlist or folder shows at once
+          return json(200, { ok: true, site: d, problems });
+        }
+        if (act === "preq") {
+          const id = String(b.id || "");
+          if (!/^[0-9a-f]{16}$/.test(id)) return json(400, { error: "id" });
+          const k = (await keys("preq/")).find((x) => x.endsWith("-" + id)), r = k ? await s.get(k, { type: "json" }) : null;
+          if (!r) return json(404, { error: "not found" });
+          if (b.action === "delete") await s.delete(k); else await s.setJSON(k, { ...r, status: b.action === "done" ? "shared" : "open" });
           return json(200, { ok: true });
         }
         if (act === "user") {
